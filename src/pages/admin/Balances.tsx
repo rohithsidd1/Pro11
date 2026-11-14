@@ -19,14 +19,17 @@ export function Balances() {
   const [lines, setLines] = useState<Line[]>([])
   const [txns, setTxns] = useState<WalletTxn[]>([])
   const [people, setPeople] = useState<Profile[]>([])
+  const [inGames, setInGames] = useState(0)
 
   useEffect(() => {
     void (async () => {
-      const [pr, tx, wd] = await Promise.all([
+      const [pr, tx, wd, live] = await Promise.all([
         supabase.from('profiles').select('*').order('name'),
         supabase.from('wallet_txns').select('*').order('created_at', { ascending: false }).limit(10000),
         supabase.from('withdrawals').select('*').in('status', ['pending', 'paid']).limit(5000),
+        supabase.from('contests').select('fee, entries(count)').in('status', ['open', 'locked', 'scored']),
       ])
+      setInGames(((live.data ?? []) as { fee: number; entries: { count: number }[] }[]).reduce((n, c) => n + c.fee * (c.entries?.[0]?.count ?? 0), 0))
       const ps = (pr.data as Profile[] | null) ?? []
       const ts = (tx.data as WalletTxn[] | null) ?? []
       const ws = (wd.data as Withdrawal[] | null) ?? []
@@ -43,7 +46,7 @@ export function Balances() {
   }, [])
 
   const sum = (k: keyof Omit<Line, 'p'>) => lines.reduce((s, l) => s + l[k], 0)
-  const holding = sum('wallet') + sum('held')
+  const holding = sum('wallet') + sum('held') + inGames
 
   const exportCsv = () => {
     const names = new Map(people.map((p) => [p.id, p.name]))
@@ -71,7 +74,7 @@ export function Balances() {
         <div className="tile" style={{ ['--c' as string]: 'var(--mint)' }}><span className="tile-k">Added this month</span><span className="tile-v">{rupees(sum('added'))}</span></div>
         <div className="tile" style={{ ['--c' as string]: 'var(--blue)' }}><span className="tile-k">Paid out this month</span><span className="tile-v">{rupees(sum('paidOut'))}</span></div>
       </div>
-      <p className="help" style={{ margin: '12px 0 4px' }}>Holding = everyone’s wallets plus withdrawals you haven’t paid yet.</p>
+      <p className="help" style={{ margin: '12px 0 4px' }}>Holding = everyone’s wallets + withdrawals you haven’t paid yet + entry fees in games that haven’t paid out (<span className="num">{rupees(inGames)}</span>).</p>
       <section className="panel" style={{ marginTop: 12 }}>
         <div className="tscroll">
           <table className="wtable">

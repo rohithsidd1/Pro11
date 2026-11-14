@@ -35,6 +35,12 @@ export function MatchPage() {
     setLoading(false)
   }, [id])
   useEffect(() => { void load() }, [load])
+  // while the match is being played, re-read it every minute (the server updates the score; no extra credits here)
+  useEffect(() => {
+    if (!m || !m.started || m.ended) return
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') void load() }, 60000)
+    return () => window.clearInterval(t)
+  }, [m, load])
 
   const run = async (mode: 'info' | 'squad') => {
     if (!m) return

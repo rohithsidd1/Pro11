@@ -91,6 +91,7 @@ export function Members() {
                   {isMe && <p className="help" style={{ marginTop: 8 }}>You can’t remove your own admin role or block yourself.</p>}
                   <div className="divider" />
                   <MemberStats person={p} />
+                  <ChangePhone person={p} onDone={() => void load()} />
                   {!isMe && (
                     <button className="btn sm" style={{ marginTop: 10 }} onClick={async () => {
                       if (!window.confirm(`Sign ${p.name.split(' ')[0]} out on all their devices? They can sign in again with a new code.`)) return
@@ -254,6 +255,34 @@ function MemberStats({ person }: { person: Profile }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function ChangePhone({ person, onDone }: { person: Profile; onDone: () => void }) {
+  const toast = useToast()
+  const [open, setOpen] = useState(false)
+  const [phone, setPhone] = useState('')
+  const [busy, setBusy] = useState(false)
+  const digits = phone.replace(/\D/g, '').slice(-10)
+  const save = async () => {
+    setBusy(true)
+    const { error } = await supabase.rpc('admin_change_phone', { p_user: person.id, p_phone: digits })
+    setBusy(false)
+    if (error) return toast(errorText(error))
+    toast(`${person.name.split(' ')[0]} now signs in with +91 ${digits.slice(0, 5)} ${digits.slice(5)}`)
+    setOpen(false); setPhone(''); onDone()
+  }
+  if (!open) return <button className="btn sm" style={{ marginTop: 10, marginRight: 8 }} onClick={() => setOpen(true)}><Icon name="phone" small /><span>Change phone number</span></button>
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div className="field" style={{ margin: 0 }}><label htmlFor={`ph-${person.id}`}>New phone number</label>
+        <div className="input"><span className="pre">+91</span><input id={`ph-${person.id}`} inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="91234 56789" /></div>
+        <p className="help">Their wallet, games and history stay the same. Next time they sign in, they use the new number.</p></div>
+      <div className="btn-row" style={{ marginTop: 8 }}>
+        <button className="btn sm" onClick={() => setOpen(false)}><span>Cancel</span></button>
+        <button className="btn sm primary" disabled={busy || !/^[6-9]\d{9}$/.test(digits)} onClick={save}>{busy ? <span className="spinner" /> : <span>Save number</span>}</button>
+      </div>
     </div>
   )
 }

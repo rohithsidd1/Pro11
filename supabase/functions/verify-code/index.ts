@@ -42,8 +42,12 @@ Deno.serve(async (req) => {
     if (existing?.blocked) return json({ error: `This number can’t sign in. Ask ${s.admin_name}.` }, 403)
 
     // Every person is a Supabase Auth user with an internal address; nothing is ever emailed to it.
-    const email = `${phone.slice(1)}@members.pro11.app`
-    if (!existing) {
+    // An existing member is found by their account, so a phone number the admin changed still signs in.
+    let email = `${phone.slice(1)}@members.pro11.app`
+    if (existing) {
+      const { data: au } = await db.auth.admin.getUserById(existing.id)
+      if (au?.user?.email) email = au.user.email
+    } else {
       const { error: createErr } = await db.auth.admin.createUser({
         email, email_confirm: true, user_metadata: { name: pending.name, phone },
       })

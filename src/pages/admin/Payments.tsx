@@ -39,14 +39,50 @@ export function Payments() {
   }, [load])
 
   const current = [...pending, ...recent].find((x) => x.id === selected) ?? null
+  const { settings } = useAuth()
+  const ms = settings as unknown as MoneySettings
+  const [usedUtrs, setUsedUtrs] = useState<Set<string>>(new Set())
+  const [bulk, setBulk] = useState(false)
+  useEffect(() => {
+    const utrs = pending.map((p) => p.utr).filter(Boolean) as string[]
+    if (!utrs.length) { setUsedUtrs(new Set()); return }
+    void supabase.from('payment_proofs').select('id, utr').in('utr', utrs).then(({ data }) => {
+      const mine = new Set(pending.map((p) => p.id))
+      setUsedUtrs(new Set(((data ?? []) as { id: string; utr: string }[]).filter((r) => !mine.has(r.id)).map((r) => r.utr)))
+    })
+  }, [pending])
+  const clean = pending.filter((p) => isClean(p, ms, usedUtrs))
+  const approveClean = async (list: Row[]) => {
+    const total = list.reduce((n, p) => n + p.amount, 0)
+    if (!window.confirm(`Approve ${list.length === 1 ? `${list[0].who?.name}’s ${rupees(list[0].amount)}` : `${list.length} payments, ${rupees(total)} in all`}? Check the money arrived in your UPI app first.`)) return
+    setBulk(true)
+    let ok = 0
+    for (const p of list) {
+      const { error } = await supabase.rpc('admin_review_topup', { p_id: p.id, p_approve: true, p_amount: p.amount })
+      if (error) toast(`${p.who?.name}: ${errorText(error)}`); else ok++
+    }
+    setBulk(false)
+    toast(`${ok} ${ok === 1 ? 'payment' : 'payments'} approved`)
+    setSelected(null); void load()
+  }
 
   return (
-    <Shell title="Payments" kicker={pending.length ? `${pending.length} to check` : 'All checked'}>
+    <Shell title="Payments" kicker={pending.length ? `${pending.length} to check` : 'All checked'}
+      actions={clean.length > 1 ? <button className="btn sm primary" disabled={bulk} onClick={() => approveClean(clean)}>{bulk ? <span className="spinner" /> : <><Icon name="check" small /><span>Approve {clean.length} clean</span></>}</button> : undefined}>
       <div className="review-layout">
         <div className="rl-queue">
           {pending.length === 0 && <Empty icon="check" title="Nothing to check">New payments show up here, oldest first.</Empty>}
           <div className="list">
-            {pending.map((p) => <QueueRow key={p.id} p={p} active={p.id === selected} onClick={() => setSelected(p.id)} />)}
+            {pending.map((p) => (
+              <div key={p.id} style={{ display: 'grid', gap: 4 }}>
+                <QueueRow p={p} active={p.id === selected} onClick={() => setSelected(p.id)} />
+                {isClean(p, ms, usedUtrs) && (
+                  <button className="btn sm" style={{ justifySelf: 'start', marginLeft: 12 }} disabled={bulk} onClick={() => approveClean([p])}>
+                    <Icon name="check" small /><span>All checks green: approve {rupees(p.amount)}</span>
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
         <div className="rl-detail">{current ? <Review key={current.id} p={current} onDone={(msg) => { toast(msg); setSelected(null); void load() }} /> : null}</div>
@@ -191,4 +227,12 @@ function Review({ p, onDone }: { p: Row; onDone: (msg: string) => void }) {
 
 function Check({ ok, text }: { ok: boolean; text: string }) {
   return <p className={`check ${ok ? 'ok' : 'warn'}`}><span className="ci"><Icon name={ok ? 'check' : 'alert'} /></span><span>{text}</span></p>
+}
+
+/** Every automatic check is green: amount found, paid to you, a UTR never used before, paid recently, accepted app. */
+function isClean(p: Row, s: MoneySettings | null, usedUtrs: Set<string>): boolean {
+  if (!s || !p.utr || usedUtrs.has(p.utr)) return false
+  const recent = p.paid_at ? Math.abs(new Date(p.created_at).getTime() - new Date(p.paid_at).getTime()) < 3 * 864e5 : false
+  const accepted = { phonepe: s.accept_phonepe, gpay: s.accept_gpay, paytm: s.accept_paytm, other: s.accept_other_upi }[p.app]
+  return Boolean(p.ocr?.amountMatches && p.ocr?.toMatches && recent && accepted)
 }

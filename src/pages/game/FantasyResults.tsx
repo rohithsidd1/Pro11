@@ -95,6 +95,7 @@ export function FantasyResults() {
                   <span style={{ minWidth: 0 }}>
                     <span className="rt" style={{ fontSize: 14.5 }}>{byId.get(p.player_id)?.name ?? p.player_id}{p.captain && <span className="cbadge">C</span>}{p.vice && <span className="cbadge">VC</span>}</span>
                     <span className="rs">{shortTeam(p.team)}, {ROLE_LABEL[p.role]}{mult > 1 && hasPoints ? `, ${fmt(base)} × ${mult}` : ''}</span>
+                    {hasPoints && <Split pp={points.get(p.player_id)} />}
                   </span>
                   <span className="pts" style={{ fontSize: 17 }}>{hasPoints ? fmt(base * mult) : ''}</span>
                 </div>
@@ -145,4 +146,14 @@ function Compare({ mineId, otherId, setOther, entries, team, points, names, mult
       </div>
     </section>
   )
+}
+
+/** Where a player's points came from: batting, bowling, fielding (from CricketData's fantasy points). */
+function Split({ pp }: { pp?: import('../../lib/types').PlayerPoints }) {
+  if (!pp) return <span className="rs">Didn’t score yet</span>
+  const parts = [['Bat', pp.bat], ['Bowl', pp.bowl], ['Field', pp.field]].filter(([, v]) => Number(v)) as [string, number][]
+  const rest = Number(pp.points) - parts.reduce((n, [, v]) => n + Number(v), 0)
+  if (rest) parts.push(['Other', rest])
+  if (!parts.length) return null
+  return <span className="split">{parts.map(([k, v]) => <span key={k} className="split-i"><b>{k}</b> {fmt(Number(v))}</span>)}</span>
 }

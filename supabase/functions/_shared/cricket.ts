@@ -44,43 +44,42 @@ type Raw = Record<string, any>
 export interface MatchRow extends Raw { id: string }
 export interface TeamRow { key: string; name: string; short_name?: string; img?: string; updated_at: string }
 
-export function parseMatch(m: Raw, nowIso: string): { match: MatchRow; teams: TeamRow[] } | null {
+export function parseMatch(m: Raw, nowIso: string, seriesName?: string | null): { match: MatchRow; teams: TeamRow[] } | null {
   const teams: string[] = Array.isArray(m?.teams) ? m.teams.map(String) : []
   const startsAt = toIso(m?.dateTimeGMT ?? m?.date)
   if (!m?.id || teams.length < 2 || !startsAt) return null
   const [a, b] = teams
   const info: Raw[] = Array.isArray(m.teamInfo) ? m.teamInfo : []
   const ti = (n: string) => info.find((t) => String(t?.name).toLowerCase() === n.toLowerCase())
-  const parts = String(m.name ?? `${a} vs ${b}`).split(',').map((s) => s.trim()).filter(Boolean)
   const name = String(m.name ?? `${a} vs ${b}`)
+  const parts = name.split(',').map((s) => s.trim()).filter(Boolean)
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(m, k) && m[k] !== undefined && m[k] !== null
 
+  // Always known
   const row: MatchRow = {
-    id: String(m.id),
-    name,
-    label: parts[1] ?? null,
-    series_name: parts.slice(2).join(', ') || null,
-    series_id: m.series_id ?? null,
-    match_type: m.matchType ?? null,
+    id: String(m.id), name, starts_at: startsAt, team_a: a, team_b: b,
     format: FORMATS[String(m.matchType ?? '').toLowerCase()] ?? 'Other',
-    category: categorize(name, a, b),
+    category: categorize(name + (seriesName ? `, ${seriesName}` : ''), a, b),
     is_women: /\bwomen\b/i.test(name) || teams.some((t) => /\bwomen\b/i.test(t)),
-    venue: m.venue ?? null,
-    starts_at: startsAt,
-    team_a: a,
-    team_b: b,
-    team_a_short: ti(a)?.shortname ?? null,
-    team_b_short: ti(b)?.shortname ?? null,
-    team_a_img: ti(a)?.img ?? null,
-    team_b_img: ti(b)?.img ?? null,
-    status_text: m.status ?? null,
-    started: Boolean(m.matchStarted),
-    ended: Boolean(m.matchEnded),
-    score: Array.isArray(m.score) ? m.score : [],
-    has_squad: Boolean(m.hasSquad),
-    fantasy_ok: Boolean(m.fantasyEnabled),
     last_synced_at: nowIso,
   }
-  // Only overwrite toss/result when the source actually has them.
+  // Only what this answer actually contains, so one list never blanks what another list filled in
+  if (parts[1]) row.label = parts[1]
+  const series = parts.slice(2).join(', ') || seriesName || null
+  if (series) row.series_name = series
+  if (has('series_id')) row.series_id = String(m.series_id)
+  if (has('matchType')) row.match_type = m.matchType
+  if (has('venue')) row.venue = m.venue
+  if (has('status')) row.status_text = m.status
+  if (has('matchStarted')) row.started = Boolean(m.matchStarted)
+  if (has('matchEnded')) row.ended = Boolean(m.matchEnded)
+  if (Array.isArray(m.score)) row.score = m.score
+  if (has('hasSquad')) row.has_squad = Boolean(m.hasSquad)
+  if (has('fantasyEnabled')) row.fantasy_ok = Boolean(m.fantasyEnabled)
+  if (ti(a)?.shortname) row.team_a_short = ti(a)!.shortname
+  if (ti(b)?.shortname) row.team_b_short = ti(b)!.shortname
+  if (ti(a)?.img) row.team_a_img = ti(a)!.img
+  if (ti(b)?.img) row.team_b_img = ti(b)!.img
   if (m.tossWinner !== undefined) row.toss_winner = m.tossWinner || null
   if (m.tossChoice !== undefined) row.toss_choice = m.tossChoice || null
   if (m.matchWinner !== undefined) row.winner = m.matchWinner || null
@@ -94,6 +93,16 @@ export function parseMatch(m: Raw, nowIso: string): { match: MatchRow; teams: Te
       updated_at: nowIso,
     }))
   return { match: row, teams: teamRows }
+}
+
+/** Upserting a list whose rows have different fields would blank the missing ones; save rows grouped by their fields. */
+export function groupByFields<T extends Record<string, unknown>>(rows: T[]): T[][] {
+  const groups = new Map<string, T[]>()
+  for (const r of rows) {
+    const k = Object.keys(r).sort().join(',')
+    groups.set(k, [...(groups.get(k) ?? []), r])
+  }
+  return [...groups.values()]
 }
 
 export interface PlayerRow {

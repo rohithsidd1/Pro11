@@ -12,16 +12,16 @@ import { useAuth } from '../lib/auth'
 import { CARD_COLORS } from '../lib/cricket'
 import { filterMatches, useGamesFor, useMatchFeed, type DayTab, type FormatChip } from '../lib/useMatches'
 
-const TAB_LABEL: Record<DayTab, string> = { Today: 'Today', Tomorrow: 'Tomorrow', Later: 'Day after', Live: 'Live', Mine: 'My games' }
+const TAB_LABEL: Record<DayTab, string> = { Today: 'Today', Tomorrow: 'Tomorrow', Later: 'Later', Live: 'Live', Mine: 'My games' }
 const CHIPS: FormatChip[] = ['All', 'T20', 'ODI', 'Test', 'Women']
 
 export function Home() {
   const { profile, settings } = useAuth()
-  const cfg = (settings ?? {}) as unknown as { days_ahead?: number; home_tab?: DayTab; app_name?: string }
-  const TABS: DayTab[] = cfg.days_ahead === 3 ? ['Today', 'Tomorrow', 'Later', 'Live', 'Mine'] : ['Today', 'Tomorrow', 'Live', 'Mine']
+  const cfg = (settings ?? {}) as unknown as { home_tab?: DayTab; app_name?: string }
+  const TABS: DayTab[] = ['Today', 'Tomorrow', 'Later', 'Live', 'Mine']
   const navigate = useNavigate()
   useEffect(() => { if (!pushAsked() && pushPermission() === 'default') navigate('/alerts') }, [navigate])
-  const { matches, loading, error, reload } = useMatchFeed('match_feed', cfg.days_ahead ?? 2)
+  const { matches, loading, error, reload } = useMatchFeed('match_feed')
   const { balance, loading: walletLoading } = useWallet()
   const [tab, setTab] = useState<DayTab>(cfg.home_tab === 'Mine' ? 'Mine' : 'Today')
   const [chip, setChip] = useState<FormatChip>('All')
@@ -29,7 +29,7 @@ export function Home() {
   const mineSet = new Set([...games.entries()].filter(([, g]) => g.mine).map(([id]) => id))
   const shown = filterMatches(matches, tab, chip, mineSet)
   const todayCount = filterMatches(matches, 'Today', 'All').length
-  const liveCount = filterMatches(matches, 'Live', 'All').length
+  const liveCount = filterMatches(matches, 'Live', 'All', mineSet).length
 
   return (
     <Shell title="Matches" kicker={profile ? `Hi ${profile.name.split(' ')[0]}` : undefined}
@@ -41,7 +41,7 @@ export function Home() {
         <div>
           <p className="kicker">Cricket</p>
           <p className="brand">{(cfg.app_name ?? 'Pro11').toUpperCase()}</p>
-          <p className="lead"><span className="num">{todayCount}</span> {todayCount === 1 ? 'match' : 'matches'} today{liveCount ? <>, <span className="num">{liveCount}</span> live</> : ''}</p>
+          <p className="lead"><span className="num">{todayCount}</span> {todayCount === 1 ? 'match' : 'matches'} still to start today{liveCount ? <>, <span className="num">{liveCount}</span> of yours live</> : ''}</p>
         </div>
         <svg className="ball" aria-hidden="true"><use href="#ball" /></svg>
       </div>
@@ -67,9 +67,9 @@ export function Home() {
         </Empty>
       )}
       {!error && !loading && shown.length === 0 && (
-        <Empty icon="stumps" title={tab === 'Mine' ? 'You haven’t joined a game yet' : tab === 'Live' ? 'Nothing live right now' : `No ${chip === 'All' ? '' : chip === 'Women' ? 'women’s ' : `${chip} `}matches ${tab.toLowerCase()}`}
+        <Empty icon="stumps" title={tab === 'Mine' ? 'You haven’t joined a game yet' : tab === 'Live' ? 'None of your matches are live' : `No ${chip === 'All' ? '' : chip === 'Women' ? 'women’s ' : `${chip} `}matches ${tab === 'Later' ? 'after tomorrow yet' : tab === 'Today' ? 'left today' : 'tomorrow yet'}`}
           action={chip !== 'All' ? <button className="btn primary" onClick={() => setChip('All')}><span>Show all formats</span></button> : undefined}>
-          The list refreshes every few hours from the cricket data service.
+          {tab === 'Live' ? 'Matches you’ve joined show here while they’re being played.' : 'New matches appear automatically as CricketData publishes them.'}
         </Empty>
       )}
       {shown.length > 0 && (

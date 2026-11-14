@@ -4,19 +4,19 @@ import { supabase } from './supabase'
 import type { Match } from './types'
 import { useAuth } from './auth'
 
-/** Matches from a few days back (multi-day Tests) through tomorrow, from the filtered feed. Re-reads every minute (no API cost). */
-export function useMatchFeed(source: 'match_feed' | 'matches' = 'match_feed', daysAhead = 2) {
+/** Upcoming matches (no end date) plus recent ones, from the member's feed. Re-reads every minute (no API cost). */
+export function useMatchFeed(source: 'match_feed' | 'matches' = 'match_feed') {
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const load = useCallback(async () => {
     const { data, error: err } = await supabase.from(source).select('*')
-      .gte('starts_at', istDayStart(-5).toISOString()).lt('starts_at', istDayStart(Math.max(2, daysAhead)).toISOString())
-      .order('starts_at', { ascending: true })
+      .gte('starts_at', istDayStart(-5).toISOString())
+      .order('starts_at', { ascending: true }).limit(500)
     if (err) setError('Couldn’t load matches.')
     else { setMatches((data as Match[] | null) ?? []); setError(null) }
     setLoading(false)
-  }, [source, daysAhead])
+  }, [source])
   useEffect(() => {
     void load()
     const tick = () => { if (document.visibilityState === 'visible') void load() }
@@ -58,18 +58,28 @@ export function useGamesFor(matchIds: string[]) {
 export type DayTab = 'Today' | 'Tomorrow' | 'Later' | 'Live' | 'Mine'
 export type FormatChip = 'All' | 'T20' | 'ODI' | 'Test' | 'Women'
 
-export function filterMatches(all: Match[], tab: DayTab, chip: FormatChip, mine?: Set<string>): Match[] {
-  const t0 = istDayStart(0).getTime(), t1 = istDayStart(1).getTime(), t2 = istDayStart(2).getTime(), t3 = istDayStart(3).getTime()
+/**
+ * Today / Tomorrow / Later: matches that haven't started. Live: started and not finished; for members only the
+ * ones they joined (pass `mine`), for the admin all of them. Mine: everything the member joined.
+ */
+export function filterMatches(all: Match[], tab: DayTab, chip: FormatChip, mine?: Set<string>, opts: { liveAll?: boolean } = {}): Match[] {
+  const t1 = istDayStart(1).getTime(), t2 = istDayStart(2).getTime()
+  const upcoming = (m: Match) => !m.started && !m.ended
   const live = (m: Match) => m.started && !m.ended
   const byTab = all.filter((m) => {
     const s = new Date(m.starts_at).getTime()
-    if (tab === 'Live') return live(m)
+    if (tab === 'Live') return live(m) && (opts.liveAll || (mine?.has(m.id) ?? false))
     if (tab === 'Mine') return mine?.has(m.id) ?? false
+    if (!upcoming(m)) return false
+    if (tab === 'Today') return s < t1
     if (tab === 'Tomorrow') return s >= t1 && s < t2
-    if (tab === 'Later') return s >= t2 && s < t3
-    return (s >= t0 && s < t1) || live(m)
+    return s >= t2
   })
   const byChip = byTab.filter((m) => chip === 'All' || (chip === 'Women' ? m.is_women : m.format === chip))
-  // live first, then by start time
-  return byChip.sort((a, b) => Number(live(b)) - Number(live(a)) || a.starts_at.localeCompare(b.starts_at))
+  if (tab === 'Mine') {
+    // live first, then upcoming soonest first, then finished most recent first
+    const rank = (m: Match) => (live(m) ? 0 : upcoming(m) ? 1 : 2)
+    return byChip.sort((a, b) => rank(a) - rank(b) || (rank(a) === 2 ? b.starts_at.localeCompare(a.starts_at) : a.starts_at.localeCompare(b.starts_at)))
+  }
+  return byChip.sort((a, b) => a.starts_at.localeCompare(b.starts_at))
 }

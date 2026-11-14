@@ -5,7 +5,7 @@
 // Every call to CricketData is checked against the daily credit cap and logged with its real cost.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminClient, cors, json } from '../_shared/util.ts'
-import { parseMatch, parseSquad, parseXi, squadFieldNames, type MatchRow, type TeamRow } from '../_shared/cricket.ts'
+import { groupByFields, parseMatch, parseSquad, parseXi, squadFieldNames, type MatchRow, type TeamRow } from '../_shared/cricket.ts'
 
 const API = 'https://api.cricapi.com/v1'
 // What we expect each call to cost. The API reports the real figure (info.hitsUsed) and we log that.
@@ -20,8 +20,10 @@ type DataSettings = {
   fx_live_update?: boolean
   fx_ruleset?: number
   full_scorecard?: boolean
+  live_scores?: boolean
+  live_score_minutes?: number
 }
-interface Ctx { db: SupabaseClient; s: DataSettings; trigger: Trigger; last?: 'ok' | 'skipped' | 'error' | 'failure'; capHit?: boolean }
+interface Ctx { db: SupabaseClient; s: DataSettings; trigger: Trigger; last?: 'ok' | 'skipped' | 'error' | 'failure'; capHit?: boolean; lastInfo?: Record<string, unknown>; failures?: string[] }
 
 const utcDay = () => new Date().toISOString().slice(0, 10)
 
@@ -51,8 +53,13 @@ async function usage(db: SupabaseClient) {
   return data as { credits: number; calls: number; hits_today: number | null; hits_limit: number | null } | null
 }
 
-async function addUsage(db: SupabaseClient, spent: number, info: Record<string, unknown>) {
+async function addUsage(db: SupabaseClient, spent: number, info: Record<string, unknown>, cap = 90) {
   const u = await usage(db)
+  const after = Math.max((u?.credits ?? 0) + spent, typeof info.hitsToday === 'number' ? info.hitsToday : 0)
+  if (after >= cap * 0.8) {
+    await db.rpc('admin_alert', { p_kind: 'credits_80', p_title: `Cricket data credits: ${after} of ${cap} used today`,
+      p_body: 'Syncing stops at the limit until CricketData resets the count.', p_link: '/admin/data', p_cooldown_minutes: 1200 })
+  }
   await db.from('api_usage').upsert({
     day: utcDay(),
     credits: (u?.credits ?? 0) + spent,
@@ -108,14 +115,17 @@ async function api(ctx: Ctx, endpoint: string, params: Record<string, string>, m
     try { body = JSON.parse(text) } catch { body = { status: 'failure', reason: `HTTP ${res.status}: ${text.slice(0, 120)}` } }
   } catch (e) {
     ctx.last = 'error'
+    ctx.failures = [...(ctx.failures ?? []), `${endpoint}: couldn’t reach CricketData`]
     await log(ctx, endpoint, matchId, 0, false, hideKey(`${proxyUrl ? 'Proxy' : 'Network'} error: ${String(e)}`).slice(0, 200))
     return null
   }
   const info = (body?.info ?? {}) as Record<string, unknown>
+  ctx.lastInfo = info
   const spent = typeof info.hitsUsed === 'number' ? info.hitsUsed : (body?.info ? expected : 0)
-  if (spent > 0 || body?.info) await addUsage(ctx.db, spent, info)
+  if (spent > 0 || body?.info) await addUsage(ctx.db, spent, info, ctx.s.daily_credit_cap)
   if (body?.status !== 'success') {
     ctx.last = body?.info ? 'failure' : 'error'      // CricketData answered "no" vs. the request never really happened
+    ctx.failures = [...(ctx.failures ?? []), `${endpoint}: ${hideKey(String(body?.reason ?? body?.status ?? 'failed')).slice(0, 80)}`]
     await log(ctx, endpoint, matchId, spent, false, hideKey(String(body?.reason ?? body?.status ?? 'Failed')).slice(0, 200))
     return null
   }
@@ -125,46 +135,77 @@ async function api(ctx: Ctx, endpoint: string, params: Record<string, string>, m
   return body.data
 }
 
-async function saveMatches(db: SupabaseClient, raw: unknown[]): Promise<number> {
+async function saveMatches(db: SupabaseClient, raw: unknown[], seriesName?: string | null): Promise<number> {
   const now = new Date().toISOString()
   const matches: MatchRow[] = []
   const teams = new Map<string, TeamRow>()
   for (const m of raw) {
-    const parsed = parseMatch(m as Record<string, unknown>, now)
+    const parsed = parseMatch(m as Record<string, unknown>, now, seriesName)
     if (!parsed) continue
     matches.push(parsed.match)
     for (const t of parsed.teams) teams.set(t.key, { ...teams.get(t.key), ...t })
   }
-  if (teams.size) await db.from('teams').upsert([...teams.values()])
-  if (matches.length) {
-    const { error } = await db.from('matches').upsert(matches)
+  for (const g of groupByFields([...teams.values()] as unknown as Record<string, unknown>[])) await db.from('teams').upsert(g)
+  for (const g of groupByFields(matches as Record<string, unknown>[])) {
+    const { error } = await db.from('matches').upsert(g)
     if (error) throw error
   }
   return matches.length
 }
 
+/** The match list (live, recent and starting soon): every page, 25 matches a page, 1 credit each (max 4 pages). */
 async function syncList(ctx: Ctx) {
-  let saved = 0
-  for (let offset = 0, page = 0; page < 2; page++, offset += 25) {
+  let saved = 0, pages = 0
+  for (let offset = 0; pages < 4; offset += 25) {
     const data = await api(ctx, 'currentMatches', { offset: String(offset) })
     if (!Array.isArray(data)) break
+    pages++
     saved += await saveMatches(ctx.db, data)
-    if (data.length < 25) break
+    const total = Number(ctx.lastInfo?.totalRows ?? 0)
+    if (data.length < 25 || offset + 25 >= total) break
   }
   await ctx.db.from('app_settings').update({ last_list_sync_at: new Date().toISOString() }).eq('id', 1)
-  return { saved }
+  const { data: opened } = await ctx.db.rpc('notify_squads_out')
+  return { saved, pages, squadsOut: opened ?? 0 }
 }
 
-async function syncFixtures(ctx: Ctx) {
-  let saved = 0
-  for (let page = 0; page < Math.max(1, ctx.s.fixtures_pages); page++) {
-    const data = await api(ctx, 'matches', { offset: String(page * 25) })
-    if (!Array.isArray(data)) break
-    saved += await saveMatches(ctx.db, data)
-    if (data.length < 25) break
+/**
+ * Upcoming matches: the full schedule of each series being played (series_info, 1 credit per series),
+ * at most once a day per series and at most `fixtures_pages` series per run. Removed leagues are skipped.
+ */
+async function syncSchedules(ctx: Ctx) {
+  const max = Math.max(0, ctx.s.fixtures_pages)
+  let saved = 0, series = 0
+  if (max > 0) {
+    const since = new Date(Date.now() - 3 * 864e5).toISOString()
+    const { data: rows } = await ctx.db.from('matches').select('series_id, fantasy_ok, ended').not('series_id', 'is', null).gte('starts_at', since)
+    const { data: blocked } = await ctx.db.from('blocked_series').select('series_id')
+    const { data: checks } = await ctx.db.from('series_schedule_checks').select('series_id, checked_at')
+    const skip = new Set((blocked ?? []).map((b: { series_id: string }) => b.series_id))
+    const fresh = new Set((checks ?? []).filter((c: { checked_at: string }) => Date.now() - new Date(c.checked_at).getTime() < 20 * 36e5).map((c: { series_id: string }) => c.series_id))
+    // Only series still being played that have fantasy data (games can only run on those).
+    const live = new Set<string>()
+    for (const r of (rows ?? []) as { series_id: string; fantasy_ok: boolean; ended: boolean }[]) if (r.fantasy_ok && !r.ended) live.add(r.series_id)
+    const todo = [...live].filter((id) => !skip.has(id) && !fresh.has(id)).slice(0, max)
+    for (const id of todo) {
+      const data = await api(ctx, 'series_info', { id })
+      if (ctx.last === 'skipped' || ctx.last === 'error') break
+      // deno-lint-ignore no-explicit-any
+      const d = (data ?? {}) as any
+      const list: unknown[] = Array.isArray(d.matchList) ? d.matchList : []
+      const upcoming = list.filter((m) => {
+        // deno-lint-ignore no-explicit-any
+        const x = m as any
+        const t = new Date(String(x?.dateTimeGMT ?? x?.date ?? '') + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(x?.dateTimeGMT ?? '')) ? '' : 'Z')).getTime()
+        return !x?.matchEnded && (isNaN(t) || t > Date.now() - 6 * 36e5)
+      }).map((m) => ({ ...(m as Record<string, unknown>), series_id: id }))
+      saved += await saveMatches(ctx.db, upcoming, d?.info?.name ?? null)
+      await ctx.db.from('series_schedule_checks').upsert({ series_id: id, checked_at: new Date().toISOString(), matches: upcoming.length })
+      series++
+    }
   }
   await ctx.db.from('app_settings').update({ last_fixtures_sync_at: new Date().toISOString() }).eq('id', 1)
-  return { saved }
+  return { saved, series }
 }
 
 async function syncInfo(ctx: Ctx, matchId: string) {
@@ -221,13 +262,20 @@ async function fetchPoints(ctx: Ctx, matchId: string, final: boolean): Promise<S
   }
   // deno-lint-ignore no-explicit-any
   const d = (data ?? {}) as any
-  const pts = new Map<string, number>()
+  // totals per player, and the split (batting / bowling / fielding) summed over every innings
+  const pts = new Map<string, { points: number; bat: number; bowl: number; field: number }>()
+  const get = (id: string) => pts.get(id) ?? (pts.set(id, { points: 0, bat: 0, bowl: 0, field: 0 }), pts.get(id)!)
+  const KIND: Record<string, 'bat' | 'bowl' | 'field'> = { batting: 'bat', bowling: 'bowl', catching: 'field' }
   for (const inn of Array.isArray(d.innings) ? d.innings : []) {
-    for (const k of ['batting', 'bowling', 'catching']) for (const p of Array.isArray(inn?.[k]) ? inn[k] : []) if (p?.id && !pts.has(String(p.id))) pts.set(String(p.id), 0)
+    for (const k of Object.keys(KIND)) for (const p of Array.isArray(inn?.[k]) ? inn[k] : []) {
+      if (p?.id) get(String(p.id))[KIND[k]] += Number(p.points) || 0
+    }
   }
-  for (const t of Array.isArray(d.totals) ? d.totals : []) if (t?.id) pts.set(String(t.id), Number(t.points) || 0)
+  for (const t of Array.isArray(d.totals) ? d.totals : []) if (t?.id) get(String(t.id)).points = Number(t.points) || 0
+  // if a player has a split but no total, the total is the split
+  for (const v of pts.values()) if (!v.points && (v.bat || v.bowl || v.field)) v.points = v.bat + v.bowl + v.field
   if (pts.size) {
-    await ctx.db.from('player_points').upsert([...pts.entries()].map(([player_id, points]) => ({ match_id: matchId, player_id, points, final, updated_at: now })))
+    await ctx.db.from('player_points').upsert([...pts.entries()].map(([player_id, v]) => ({ match_id: matchId, player_id, ...v, final, updated_at: now })))
   }
   await ctx.db.rpc('score_fantasy_match', { p_match: matchId, p_final: final && pts.size > 0 })
   let xi = false
@@ -373,9 +421,14 @@ async function syncGames(ctx: Ctx) {
         && now > new Date(xi.lock_at).getTime() + 10 * 60e3) {
       out[`xi ${matchId}`] = await syncSquad(ctx, matchId, { xiCheck: true })
     }
-    // Has it finished? After the expected end, a 1-credit check every 30 minutes until it has.
-    if (!m.ended && now > start + END_AFTER_MIN[fmt] * 60e3
-        && (!m.end_checked_at || now - new Date(m.end_checked_at).getTime() > 30 * 60e3)) {
+    // Live score and "has it finished?": 1 credit per check while a joined match is being played.
+    // T20 every `live_score_minutes` (default 30), ODI twice that, Test every 6 hours. With live scores off,
+    // it only checks after the expected end, every 30 minutes.
+    const base = Math.max(15, ctx.s.live_score_minutes ?? 30)
+    const every = (fmt === 'Test' ? 360 : fmt === 'ODI' ? base * 2 : base) * 60e3
+    const liveOn = ctx.s.live_scores !== false
+    const due = liveOn ? now > start : now > start + END_AFTER_MIN[fmt] * 60e3
+    if (!m.ended && due && (!m.end_checked_at || now - new Date(m.end_checked_at).getTime() > (liveOn ? every : 30 * 60e3))) {
       await ctx.db.from('matches').update({ end_checked_at: new Date().toISOString() }).eq('id', matchId)
       await syncInfo(ctx, matchId)
       const { data: fresh } = await ctx.db.from('matches').select('ended, status_text, final_points_at, xi_source').eq('id', matchId).maybeSingle()
@@ -408,10 +461,14 @@ async function tick(ctx: Ctx) {
   // 5 minutes of slack so an hourly job lands on the 3-hour mark reliably.
   if (hoursSince(ctx.s.last_list_sync_at) >= ctx.s.list_refresh_hours - 0.09) out.list = await syncList(ctx)
   if (ctx.s.fixtures_pages > 0 && hoursSince(ctx.s.last_fixtures_sync_at) >= ctx.s.fixtures_refresh_hours - 0.09) {
-    out.fixtures = await syncFixtures(ctx)
+    out.schedules = await syncSchedules(ctx)
   }
   const games = await syncGames(ctx)
   if (Object.keys(games).length) out.games = games
+  if (ctx.failures?.length) {
+    await ctx.db.rpc('admin_alert', { p_kind: 'sync_failed', p_title: 'Cricket data sync had a problem',
+      p_body: ctx.failures.slice(0, 3).join(' · '), p_link: '/admin/data', p_cooldown_minutes: 360 })
+  }
   return Object.keys(out).length ? out : { skipped: 'Nothing due' }
 }
 
@@ -448,7 +505,7 @@ Deno.serve(async (req) => {
 
     if (!caller.isAdmin) return json({ error: 'Not allowed.' }, 401)
     if (mode === 'list') return json({ ok: true, result: await syncList(ctx) })
-    if (mode === 'fixtures') return json({ ok: true, result: await syncFixtures(ctx) })
+    if (mode === 'fixtures') return json({ ok: true, result: await syncSchedules(ctx) })
     if (mode === 'info' && matchId) return json({ ok: true, result: await syncInfo(ctx, matchId) })
     if (mode === 'squad' && matchId) return json({ ok: true, result: await syncSquad(ctx, matchId, { force: true }) })
     return json({ error: 'Unknown request.' }, 400)

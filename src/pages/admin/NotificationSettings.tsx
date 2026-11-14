@@ -6,11 +6,11 @@ import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
 import { useSettingsForm } from '../../lib/useSettingsForm'
 
-type N = { n_xi_out: boolean; n_lock_soon: boolean; n_lock_minutes: number; n_money: boolean; n_results: boolean; n_withdrawal: boolean }
+type N = { n_squads_out: boolean; n_xi_out: boolean; n_lock_soon: boolean; n_lock_minutes: number; n_money: boolean; n_results: boolean; n_withdrawal: boolean }
 
 export function NotificationSettings() {
   const toast = useToast()
-  const { f, set, save, busy } = useSettingsForm<N>(['n_xi_out', 'n_lock_soon', 'n_lock_minutes', 'n_money', 'n_results', 'n_withdrawal'])
+  const { f, set, save, busy } = useSettingsForm<N>(['n_squads_out', 'n_xi_out', 'n_lock_soon', 'n_lock_minutes', 'n_money', 'n_results', 'n_withdrawal'])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
@@ -31,6 +31,7 @@ export function NotificationSettings() {
       <div className="cols-2">
         <section className="panel">
           <div className="ch"><h3>Send to members</h3></div>
+          <Sw k="n_squads_out" label="Squads are out, games are open" sub="One alert per refresh, listing the new matches" />
           <Sw k="n_xi_out" label="Playing XI is out" />
           <Sw k="n_lock_soon" label="Game locks soon" sub="To people in the game" />
           <div className="rule"><p className="k">Remind before the lock</p>
@@ -41,7 +42,7 @@ export function NotificationSettings() {
           <Sw k="n_money" label="Payment approved or rejected" sub="Also wallet changes by the admin" />
           <Sw k="n_results" label="Results and payouts" sub="Also cancelled games and refunds" />
           <Sw k="n_withdrawal" label="Withdrawal paid or rejected" />
-          <p className="help" style={{ marginTop: 10 }}>Alerts appear in the app’s bell, and on phones that turned alerts on. Money waiting for you (payments, withdrawals) always reaches you.</p>
+          <p className="help" style={{ marginTop: 10 }}>Alerts appear in the app’s bell, and on phones that turned alerts on. Money waiting for you (payments, withdrawals) and problems (sync failures, credits at 80%, automatic refunds, removed leagues, payouts) always reach you.</p>
           <button className="btn primary" style={{ marginTop: 14 }} disabled={busy} onClick={() => save()}>{busy ? <span className="spinner" /> : <><Icon name="check" /><span>Save</span></>}</button>
         </section>
         <section className="panel">

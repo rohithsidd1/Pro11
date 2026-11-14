@@ -40,6 +40,7 @@ export function MatchCard({ m, color, games }: { m: Match; color: string; games?
         <div className="meta">
           {statusPills(m).map((p) => <span key={p} className="m">{p}</span>)}
           {m.is_women && <span className="m">Women</span>}
+          {!m.started && !m.ended && !m.has_squad && !m.squad_fetched_at && <span className="m">Squads soon</span>}
           {games && games.xiJoined > 0 && <span className="m">Playing XI: <span className="num">{games.xiJoined}</span> joined</span>}
           {games && games.fxJoined > 0 && <span className="m">Fantasy: <span className="num">{games.fxJoined}</span> joined</span>}
           {games?.mine && <span className="m you">You’re in</span>}

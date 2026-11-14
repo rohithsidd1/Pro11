@@ -7,10 +7,13 @@ import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
 import type { DataSettings } from '../../lib/types'
 import { useDataStatus } from '../../lib/useDataSettings'
+import { useSettingsForm } from '../../lib/useSettingsForm'
 
 const ENDPOINT: Record<string, string> = {
-  currentMatches: 'Match list', matches: 'Upcoming fixtures', match_info: 'Match details', match_squad: 'Match squad', series_squad: 'Series squad', match_points: 'Fantasy points',
+  currentMatches: 'Match list', matches: 'Fixtures (old)', series_info: 'Series schedule', match_info: 'Match details', match_squad: 'Match squad', series_squad: 'Series squad', match_points: 'Fantasy points',
 }
+
+const hrs = (h: number) => (Math.abs(h) >= 48 ? `${Math.round(h / 24)} d` : `${Math.round(h)} h`)
 
 export function CricketData() {
   const toast = useToast()
@@ -37,6 +40,8 @@ export function CricketData() {
     toast('Saved'); void reload()
   }
 
+  const [leads, setLeads] = useState<{ series: string; category: string; matches: number; typical_hours: number; earliest_hours: number; latest_hours: number }[]>([])
+  useEffect(() => { void supabase.rpc('squad_lead_times', { p_days: 30 }).then(({ data }) => setLeads((data as never) ?? [])) }, [])
   const [blocked, setBlocked] = useState<{ series_id: string; reason: string; blocked_at: string; name?: string }[]>([])
   useEffect(() => {
     void (async () => {
@@ -61,8 +66,8 @@ export function CricketData() {
   const sync = async (mode: 'list' | 'fixtures') => {
     setBusy(mode)
     try {
-      const r = await callFunction<{ result: { saved: number } }>('sync-cricket', { mode })
-      toast(`${r.result.saved} matches updated`)
+      const r = await callFunction<{ result: { saved: number; pages?: number; series?: number } }>('sync-cricket', { mode })
+      toast(mode === 'list' ? `${r.result.saved} matches from ${r.result.pages ?? 0} pages` : `${r.result.saved} upcoming matches from ${r.result.series ?? 0} series`)
     } catch (e) { toast(e instanceof Error ? e.message : 'Couldn’t sync') } finally { setBusy(null); void reload() }
   }
 
@@ -96,11 +101,11 @@ export function CricketData() {
             </p>
             <div className="btn-row" style={{ marginTop: 14 }}>
               <button className="btn sm" disabled={!!busy} onClick={() => sync('list')}>{busy === 'list' ? <span className="spinner" /> : <Icon name="refresh" small />}<span>Refresh match list</span></button>
-              <button className="btn sm" disabled={!!busy} onClick={() => sync('fixtures')}>{busy === 'fixtures' ? <span className="spinner" /> : <Icon name="down" small />}<span>Load fixtures</span></button>
+              <button className="btn sm" disabled={!!busy} onClick={() => sync('fixtures')}>{busy === 'fixtures' ? <span className="spinner" /> : <Icon name="down" small />}<span>Load schedules</span></button>
             </div>
             <p className="help" style={{ marginTop: 10 }}>
               Last match list: {settings?.last_list_sync_at ? `${istDayName(settings.last_list_sync_at)} ${istTime(settings.last_list_sync_at)}` : 'never'}.
-              {' '}Last fixtures: {settings?.last_fixtures_sync_at ? `${istDayName(settings.last_fixtures_sync_at)} ${istTime(settings.last_fixtures_sync_at)}` : 'never'}.
+              {' '}Last schedules: {settings?.last_fixtures_sync_at ? `${istDayName(settings.last_fixtures_sync_at)} ${istTime(settings.last_fixtures_sync_at)}` : 'never'}.
             </p>
           </section>
 
@@ -108,9 +113,9 @@ export function CricketData() {
             <section className="panel" style={{ marginTop: 8 }}>
               <div className="ch"><h3>Syncing</h3></div>
               <NumberRule k="daily_credit_cap" label="Daily credit limit" sub="Stops automatic and manual syncing here" min={1} max={100000} />
-              <NumberRule k="list_refresh_hours" label="Refresh the match list every" sub="About 1–2 credits each time" min={1} max={24} unit="hrs" />
-              <NumberRule k="fixtures_refresh_hours" label="Load upcoming fixtures every" sub="1 credit per page" min={1} max={48} unit="hrs" />
-              <NumberRule k="fixtures_pages" label="Fixture pages each time" sub="0 turns fixtures off" min={0} max={5} />
+              <NumberRule k="list_refresh_hours" label="Refresh the match list every" sub="Live, recent and starting-soon matches; 1 credit per 25 matches" min={1} max={24} unit="hrs" />
+              <NumberRule k="fixtures_refresh_hours" label="Load series schedules every" sub="Tomorrow’s and later matches of the series being played" min={1} max={48} unit="hrs" />
+              <NumberRule k="fixtures_pages" label="Series schedules each time" sub="1 credit per series; 0 turns schedules off" min={0} max={20} />
               <Toggle k="sync_paused" label="Pause all syncing" sub="Nothing is fetched until you turn this off" />
               <div className="ch" style={{ marginTop: 18 }}><h3>Save credits</h3></div>
               <label className="rule" style={{ cursor: 'pointer' }}>
@@ -121,6 +126,7 @@ export function CricketData() {
                 <div><p className="k">Get the Playing XI automatically</p><p className="s">About 10 credits per game after the toss, and 10 more after the match if needed. Off: Predict the XI games refund themselves.</p></div>
                 <input type="checkbox" role="switch" className="switch" checked={settings?.auto_xi_check ?? false} onChange={(e) => setOption(settings?.only_game_ready ?? true, e.target.checked)} />
               </label>
+              <LiveScores />
               <div className="ch" style={{ marginTop: 18 }}><h3>Which matches to show</h3></div>
               <Toggle k="show_men_intl" label="Men’s internationals" />
               <Toggle k="show_women_intl" label="Women’s internationals" />
@@ -148,6 +154,22 @@ export function CricketData() {
           </section>
         )}
         <section className="panel">
+          <div className="ch"><h3>How early squads appear</h3><span className="help">last 30 days</span></div>
+          {leads.length === 0
+            ? <p className="help">Builds up by itself. Each time CricketData first marks a match as having a squad, Pro11 notes the time (no credits). Accurate to within one list refresh.</p>
+            : (
+              <div className="tscroll">
+                <table className="wtable">
+                  <thead><tr><th scope="col">Series</th><th scope="col" className="r">Matches</th><th scope="col" className="r">Typical</th><th scope="col" className="r">Range</th></tr></thead>
+                  <tbody>{leads.map((l) => (
+                    <tr key={l.series + l.category}><td><span style={{ fontWeight: 600 }}>{l.series}</span><br /><span className="help">{l.category}</span></td>
+                      <td className="r num">{l.matches}</td><td className="r num">{hrs(l.typical_hours)} before</td><td className="r num">{hrs(l.latest_hours)}–{hrs(l.earliest_hours)}</td></tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
+        </section>
+        <section className="panel">
           <div className="ch"><h3>Recent API calls</h3><span className="help">newest first</span></div>
           {calls.length === 0 ? <p className="help">No calls yet. Tap Refresh match list to make the first one.</p> : (
             <div className="tscroll">
@@ -173,5 +195,25 @@ export function CricketData() {
         </div>
       </div>
     </Shell>
+  )
+}
+
+function LiveScores() {
+  const { f, set, save, busy } = useSettingsForm<{ live_scores: boolean; live_score_minutes: number }>(['live_scores', 'live_score_minutes'])
+  if (!f) return null
+  const t20 = Math.ceil(210 / f.live_score_minutes), odi = Math.ceil(510 / (f.live_score_minutes * 2))
+  return (
+    <>
+      <div className="ch" style={{ marginTop: 18 }}><h3>Live scores</h3></div>
+      <label className="rule" style={{ cursor: 'pointer' }}>
+        <div><p className="k">Live scores for joined matches</p><p className="s">1 credit per update, only while a match someone joined is being played. Also spots the finish sooner.</p></div>
+        <input type="checkbox" role="switch" className="switch" checked={f.live_scores} onChange={(e) => set('live_scores', e.target.checked)} />
+      </label>
+      <div className="rule"><div><p className="k">Update every</p><p className="s">T20s. ODIs every {f.live_score_minutes * 2} min, Tests every 6 hours. About {t20} credits a T20, {odi} an ODI.</p></div>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <input className="num-in" type="number" min={15} max={180} value={f.live_score_minutes} aria-label="Minutes between live updates" onChange={(e) => set('live_score_minutes', Math.max(15, Math.min(180, Math.floor(Number(e.target.value) || 30))))} />
+          <span className="help">min</span></span></div>
+      <button className="btn sm" style={{ marginTop: 8 }} disabled={busy} onClick={() => save()}>{busy ? <span className="spinner" /> : <span>Save live scores</span>}</button>
+    </>
   )
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { callFunction, errorText } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -29,6 +29,11 @@ export function GameCard({ match, game }: { match: Match; game: GameKind }) {
   const { contest, entries, mine, myPicks, myTeam, loading, reload } = useContest(match.id, game)
   const { balance } = useWallet()
   const [busy, setBusy] = useState(false)
+  const [squadsOut, setSquadsOut] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (match.has_squad || match.squad_fetched_at) { setSquadsOut(true); return }
+    void supabase.rpc('squads_ready', { p_match: match.id }).then(({ data }) => setSquadsOut(Boolean(data)))
+  }, [match.id, match.has_squad, match.squad_fetched_at])
   const g = GAME[game]
   const minPlayers = (settings as unknown as { min_players?: number })?.min_players ?? 2
   if (loading || !contest) return <li className="card game" style={{ ['--c' as string]: g.color }}><p className="help">Loading…</p></li>
@@ -80,7 +85,10 @@ export function GameCard({ match, game }: { match: Match; game: GameKind }) {
         <div><dt>Pot</dt><dd>{rupees(pot)}</dd></div>
       </dl>
 
-      {open && !mine && (
+      {open && !mine && squadsOut === false && (
+        <p className="needs">Games open once the squads are announced. Check back closer to the match.</p>
+      )}
+      {open && !mine && squadsOut !== false && (
         <>
           <p className="needs">{line}</p>
           {short > 0

@@ -10,6 +10,8 @@ const ICON: Record<string, [IconName, string]> = {
   withdrawal_paid: ['up', 'var(--ok-bg)'], withdrawal_rejected: ['x', 'var(--bad-bg)'], withdrawal_waiting: ['up', 'var(--warn-bg)'],
   wallet_adjusted: ['sliders', 'var(--soft)'], contest_scored: ['trophy', 'var(--lemon)'], contest_paid: ['trophy', 'var(--mint)'],
   contest_cancelled: ['ban', 'var(--soft)'],
+  squads_out: ['stumps', 'var(--mint)'], xi_out: ['user', 'var(--mint)'], lock_soon: ['clock', 'var(--warn-bg)'],
+  admin_alert: ['alert', 'var(--warn-bg)'], broadcast: ['send', 'var(--lemon)'],
 }
 
 export function Notifications() {

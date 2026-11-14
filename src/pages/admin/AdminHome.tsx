@@ -104,7 +104,7 @@ const MANAGE: { to: string; icon: IconName; label: string; sub: string }[] = [
   { to: '/admin/matches', icon: 'stumps', label: 'Matches', sub: 'Show or hide matches' },
   { to: '/admin/data', icon: 'gauge', label: 'Cricket data', sub: 'API credits, syncing, removed leagues' },
   { to: '/admin/notifications', icon: 'bell', label: 'Notifications', sub: 'What members are told, message everyone' },
-  { to: '/admin/general', icon: 'sliders', label: 'General', sub: 'App name, admin name, days shown, home tab' },
+  { to: '/admin/general', icon: 'sliders', label: 'General', sub: 'App name, admin name, home tab' },
   { to: '/admin/badges', icon: 'image', label: 'Team badges', sub: 'Upload logos for clubs and leagues' },
   { to: '/admin/appearance', icon: 'eye', label: 'Appearance', sub: 'Notched or plain match cards' },
   { to: '/admin/signin', icon: 'key', label: 'Sign-in settings', sub: 'Code length, how long people stay signed in' },

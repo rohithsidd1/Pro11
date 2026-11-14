@@ -26,9 +26,9 @@ export function AdminMatches() {
   const toast = useToast()
   const { matches, reload } = useMatchFeed('matches')
   const { settings, used, reload: reloadStatus } = useDataStatus()
-  const [tab, setTab] = useState<'Today' | 'Tomorrow' | 'Live'>('Today')
+  const [tab, setTab] = useState<'Today' | 'Tomorrow' | 'Later' | 'Live'>('Today')
   const [busy, setBusy] = useState(false)
-  const list = filterMatches(matches, tab, 'All')
+  const list = filterMatches(matches, tab, 'All', undefined, { liveAll: true })
   const [blocked, setBlocked] = useState<Set<string>>(new Set())
   useEffect(() => { void supabase.from('blocked_series').select('series_id').then(({ data }) => setBlocked(new Set((data ?? []).map((r: { series_id: string }) => r.series_id)))) }, [])
 
@@ -55,8 +55,8 @@ export function AdminMatches() {
         Credits used today: <b className="num">{used}</b> of <span className="num">{settings?.daily_credit_cap ?? 90}</span>. A refresh costs about <span className="num">1–2</span>.
         {' '}<Link to="/admin/data" className="textlink" style={{ minHeight: 0, fontSize: 12.5 }}>Cricket data settings</Link>
       </p>
-      <div className="seg" style={{ maxWidth: 420 }}>
-        {(['Today', 'Tomorrow', 'Live'] as const).map((t) => <button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}>{t}</button>)}
+      <div className="seg" style={{ maxWidth: 520 }}>
+        {(['Today', 'Tomorrow', 'Later', 'Live'] as const).map((t) => <button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}>{t}</button>)}
       </div>
 
       {list.length === 0 && <Empty icon="stumps" title="No matches here">Tap Refresh now, or wait for the next automatic refresh.</Empty>}

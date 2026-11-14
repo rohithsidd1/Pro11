@@ -177,7 +177,7 @@ export interface GameSettings {
 }
 
 export interface FantasyPick { entry_id: string; player_id: string; team: string; role: MatchPlayer['role']; captain: boolean; vice: boolean }
-export interface PlayerPoints { match_id: string; player_id: string; points: number; final: boolean; updated_at: string }
+export interface PlayerPoints { match_id: string; player_id: string; points: number; bat?: number; bowl?: number; field?: number; final: boolean; updated_at: string }
 export interface TeamRules {
   fx_max_per_side: number; fx_wk_min: number; fx_wk_max: number; fx_bat_min: number; fx_bat_max: number
   fx_ar_min: number; fx_ar_max: number; fx_bowl_min: number; fx_bowl_max: number
