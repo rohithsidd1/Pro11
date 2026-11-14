@@ -1,0 +1,13 @@
+# Minimal config for the Supabase CLI. The two sign-in functions are public:
+# they run before anyone has a session, so the platform JWT check is off and
+# the functions validate input themselves.
+project_id = "mdtqgovuodwspxztsvps"
+
+[functions.request-code]
+verify_jwt = false
+
+[functions.verify-code]
+verify_jwt = false
+
+[functions.sync-cricket]
+verify_jwt = false

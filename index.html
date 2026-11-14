@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F6CD86" />
+    <meta name="description" content="Cricket games for the family" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400..700&family=Google+Sans+Flex:wght@100..1000&family=Onest:wght@100..900&display=swap" rel="stylesheet" />
+    <title>Pro11</title>
+  </head>
+  <body>
+    <!-- Icons, flags and the ball, used everywhere via <use href="#..."> -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="ballShade" cx="36%" cy="30%" r="72%"><stop offset="0" stop-color="#F26A55"/><stop offset=".55" stop-color="#C42B1F"/><stop offset="1" stop-color="#6A130C"/></radialGradient>
+    <clipPath id="ballClip"><circle cx="80" cy="80" r="74"/></clipPath>
+  </defs>
+  <symbol id="ball" viewBox="0 0 160 160">
+    <circle cx="80" cy="80" r="74" fill="url(#ballShade)"/>
+    <g clip-path="url(#ballClip)" fill="none" stroke-linecap="round">
+      <path d="M16 117 Q100 122 144 43" stroke="#F3E2C4" stroke-width="2.6"/>
+      <path d="M10 105 Q92 112 140 37" stroke="#F3E2C4" stroke-width="2.6"/>
+      <path d="M20 126 Q106 131 152 49" stroke="#F3E2C4" stroke-width="3.4" stroke-dasharray="0.5 6" opacity=".9"/>
+      <path d="M5 96 Q86 102 133 29" stroke="#F3E2C4" stroke-width="3.4" stroke-dasharray="0.5 6" opacity=".9"/>
+    </g>
+    <ellipse cx="54" cy="46" rx="22" ry="12" fill="#FFFFFF" opacity=".22" transform="rotate(-32 54 46)"/>
+  </symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-stumps" viewBox="0 0 24 24"><path d="M7 7v13M12 7v13M17 7v13M6 4.5h5M13 4.5h5"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="3"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3L10 14"/><path d="M21 3l-7 18-4-7-7-4z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v14M6 12l6 6 6-6"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 20V6M6 12l6-6 6 6"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.2v.3"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/></symbol>
+  <symbol id="i-log" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.5M4.5 12h.5M4.5 18h.5"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M15 8l4 4-4 4M19 12H9"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 7.8v.4"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol><symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="flag-ind" viewBox="0 0 60 60"><rect width="60" height="20" fill="#FF9933"/><rect y="20" width="60" height="20" fill="#FFFFFF"/><rect y="40" width="60" height="20" fill="#138808"/>
+<circle cx="30" cy="30" r="8.2" fill="none" stroke="#06038D" stroke-width="1.3"/><g stroke="#06038D" stroke-width=".55"><line x1="30" y1="30" x2="37.60" y2="30.00"/><line x1="30" y1="30" x2="37.34" y2="31.97"/><line x1="30" y1="30" x2="36.58" y2="33.80"/><line x1="30" y1="30" x2="35.37" y2="35.37"/><line x1="30" y1="30" x2="33.80" y2="36.58"/><line x1="30" y1="30" x2="31.97" y2="37.34"/><line x1="30" y1="30" x2="30.00" y2="37.60"/><line x1="30" y1="30" x2="28.03" y2="37.34"/><line x1="30" y1="30" x2="26.20" y2="36.58"/><line x1="30" y1="30" x2="24.63" y2="35.37"/><line x1="30" y1="30" x2="23.42" y2="33.80"/><line x1="30" y1="30" x2="22.66" y2="31.97"/><line x1="30" y1="30" x2="22.40" y2="30.00"/><line x1="30" y1="30" x2="22.66" y2="28.03"/><line x1="30" y1="30" x2="23.42" y2="26.20"/><line x1="30" y1="30" x2="24.63" y2="24.63"/><line x1="30" y1="30" x2="26.20" y2="23.42"/><line x1="30" y1="30" x2="28.03" y2="22.66"/><line x1="30" y1="30" x2="30.00" y2="22.40"/><line x1="30" y1="30" x2="31.97" y2="22.66"/><line x1="30" y1="30" x2="33.80" y2="23.42"/><line x1="30" y1="30" x2="35.37" y2="24.63"/><line x1="30" y1="30" x2="36.58" y2="26.20"/><line x1="30" y1="30" x2="37.34" y2="28.03"/></g><circle cx="30" cy="30" r="1.7" fill="#06038D"/></symbol><symbol id="flag-eng" viewBox="0 0 60 60"><rect width="60" height="60" fill="#FFFFFF"/><rect x="24" width="12" height="60" fill="#CE1124"/><rect y="24" width="60" height="12" fill="#CE1124"/></symbol><symbol id="flag-sa" viewBox="0 0 60 60"><rect width="60" height="30" fill="#E03C31"/><rect y="30" width="60" height="30" fill="#001489"/>
+<path d="M-2 -2L26 30L-2 62M26 30H62" fill="none" stroke="#FFFFFF" stroke-width="19" stroke-linejoin="miter"/>
+<path d="M-2 -2L26 30L-2 62M26 30H62" fill="none" stroke="#007749" stroke-width="11" stroke-linejoin="miter"/>
+<polygon points="0,7 20,30 0,53" fill="#FFB81C"/><polygon points="0,13.5 14.4,30 0,46.5" fill="#000000"/></symbol><symbol id="flag-aus" viewBox="0 0 60 60"><rect width="60" height="60" fill="#012169"/><clipPath id="cj-aus"><rect x="0" y="0" width="30" height="30"/></clipPath>
+<g clip-path="url(#cj-aus)"><rect x="0" y="0" width="30" height="30" fill="#012169"/>
+<path d="M0 0L30 30M30 0L0 30" stroke="#fff" stroke-width="6.00"/>
+<path d="M0 0L30 30M30 0L0 30" stroke="#C8102E" stroke-width="1.98"/>
+<path d="M15.0 0V30M0 15.0H30" stroke="#fff" stroke-width="10.20"/>
+<path d="M15.0 0V30M0 15.0H30" stroke="#C8102E" stroke-width="6.00"/></g>
+<polygon points="15.00,38.00 16.39,42.12 20.47,40.64 18.12,44.29 21.82,46.56 17.50,47.00 18.04,51.31 15.00,48.20 11.96,51.31 12.50,47.00 8.18,46.56 11.88,44.29 9.53,40.64 13.61,42.12" fill="#fff"/>
+<polygon points="45.00,7.80 45.82,10.29 48.28,9.38 46.85,11.58 49.09,12.93 46.49,13.18 46.82,15.78 45.00,13.90 43.18,15.78 43.51,13.18 40.91,12.93 43.15,11.58 41.72,9.38 44.18,10.29" fill="#fff"/><polygon points="53.00,21.80 53.82,24.29 56.28,23.38 54.85,25.58 57.09,26.93 54.49,27.18 54.82,29.78 53.00,27.90 51.18,29.78 51.51,27.18 48.91,26.93 51.15,25.58 49.72,23.38 52.18,24.29" fill="#fff"/>
+<polygon points="38.00,25.80 38.82,28.29 41.28,27.38 39.85,29.58 42.09,30.93 39.49,31.18 39.82,33.78 38.00,31.90 36.18,33.78 36.51,31.18 33.91,30.93 36.15,29.58 34.72,27.38 37.18,28.29" fill="#fff"/><polygon points="45.00,43.40 45.91,46.11 48.60,45.13 47.05,47.53 49.48,49.02 46.64,49.31 47.00,52.14 45.00,50.10 43.00,52.14 43.36,49.31 40.52,49.02 42.95,47.53 41.40,45.13 44.09,46.11" fill="#fff"/><polygon points="48.50,32.60 49.15,34.11 50.78,34.26 49.55,35.34 49.91,36.94 48.50,36.10 47.09,36.94 47.45,35.34 46.22,34.26 47.85,34.11" fill="#fff"/></symbol><symbol id="flag-nz" viewBox="0 0 60 60"><rect width="60" height="60" fill="#012169"/><clipPath id="cj-nz"><rect x="0" y="0" width="30" height="30"/></clipPath>
+<g clip-path="url(#cj-nz)"><rect x="0" y="0" width="30" height="30" fill="#012169"/>
+<path d="M0 0L30 30M30 0L0 30" stroke="#fff" stroke-width="6.00"/>
+<path d="M0 0L30 30M30 0L0 30" stroke="#C8102E" stroke-width="1.98"/>
+<path d="M15.0 0V30M0 15.0H30" stroke="#fff" stroke-width="10.20"/>
+<path d="M15.0 0V30M0 15.0H30" stroke="#C8102E" stroke-width="6.00"/></g>
+<polygon points="45.00,8.60 46.06,11.54 49.18,11.64 46.71,13.56 47.59,16.56 45.00,14.80 42.41,16.56 43.29,13.56 40.82,11.64 43.94,11.54" fill="#C8102E" stroke="#fff" stroke-width="1.1"/><polygon points="53.00,23.00 53.94,25.71 56.80,25.76 54.52,27.49 55.35,30.24 53.00,28.60 50.65,30.24 51.48,27.49 49.20,25.76 52.06,25.71" fill="#C8102E" stroke="#fff" stroke-width="1.1"/>
+<polygon points="38.00,25.00 38.94,27.71 41.80,27.76 39.52,29.49 40.35,32.24 38.00,30.60 35.65,32.24 36.48,29.49 34.20,27.76 37.06,27.71" fill="#C8102E" stroke="#fff" stroke-width="1.1"/><polygon points="45.00,42.20 46.12,45.46 49.57,45.52 46.81,47.59 47.82,50.88 45.00,48.90 42.18,50.88 43.19,47.59 40.43,45.52 43.88,45.46" fill="#C8102E" stroke="#fff" stroke-width="1.1"/></symbol><symbol id="flag-pak" viewBox="0 0 60 60"><rect width="60" height="60" fill="#01411C"/><rect width="15" height="60" fill="#FFFFFF"/>
+<circle cx="37" cy="31" r="14" fill="#FFFFFF"/><circle cx="40.6" cy="27.6" r="12.2" fill="#01411C"/><polygon points="45.14,20.73 44.20,23.91 46.90,25.84 43.58,25.94 42.58,29.10 41.47,25.97 38.15,26.00 40.78,23.97 39.73,20.83 42.47,22.70" fill="#FFFFFF"/></symbol><symbol id="flag-ban" viewBox="0 0 60 60"><rect width="60" height="60" fill="#006A4E"/><circle cx="27" cy="30" r="13" fill="#F42A41"/></symbol></svg>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

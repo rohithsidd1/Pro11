@@ -1,0 +1,67 @@
+import { useState } from 'react'
+import { Empty } from '../components/Empty'
+import { Icon } from '../components/Icon'
+import { MatchCard } from '../components/MatchCard'
+import { Shell } from '../components/Shell'
+import { useAuth } from '../lib/auth'
+import { CARD_COLORS } from '../lib/cricket'
+import { filterMatches, useMatchFeed, type DayTab, type FormatChip } from '../lib/useMatches'
+
+const TABS: DayTab[] = ['Today', 'Tomorrow', 'Live']
+const CHIPS: FormatChip[] = ['All', 'T20', 'ODI', 'Test', 'Women']
+
+export function Home() {
+  const { profile } = useAuth()
+  const { matches, loading, error, reload } = useMatchFeed()
+  const [tab, setTab] = useState<DayTab>('Today')
+  const [chip, setChip] = useState<FormatChip>('All')
+  const shown = filterMatches(matches, tab, chip)
+  const todayCount = filterMatches(matches, 'Today', 'All').length
+  const liveCount = filterMatches(matches, 'Live', 'All').length
+
+  return (
+    <Shell title="Matches" kicker={profile ? `Hi ${profile.name.split(' ')[0]}` : undefined}
+      actions={<button className="icon-btn" aria-label="Notifications"><Icon name="bell" /></button>}>
+      <div className="hero-card">
+        <div>
+          <p className="kicker">Cricket</p>
+          <p className="brand">PRO11</p>
+          <p className="lead"><span className="num">{todayCount}</span> {todayCount === 1 ? 'match' : 'matches'} today{liveCount ? <>, <span className="num">{liveCount}</span> live</> : ''}</p>
+        </div>
+        <svg className="ball" aria-hidden="true"><use href="#ball" /></svg>
+      </div>
+
+      <div className="controls">
+        <nav className="tabs" aria-label="Match lists">
+          {TABS.map((t) => (
+            <button key={t} className="tab-pill" aria-pressed={tab === t} onClick={() => setTab(t)}>
+              <span className="tx">{t}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="chips" role="group" aria-label="Filter by format">
+          {CHIPS.map((c) => (
+            <button key={c} className="chip" aria-pressed={chip === c} onClick={() => setChip(c)}><span className="tx">{c}</span></button>
+          ))}
+        </div>
+      </div>
+
+      {error && (
+        <Empty icon="alert" title="Couldn’t load matches" action={<button className="btn primary" onClick={() => void reload()}><span>Try again</span></button>}>
+          Check your connection.
+        </Empty>
+      )}
+      {!error && !loading && shown.length === 0 && (
+        <Empty icon="stumps" title={tab === 'Live' ? 'Nothing live right now' : `No ${chip === 'All' ? '' : chip === 'Women' ? 'women’s ' : `${chip} `}matches ${tab.toLowerCase()}`}
+          action={chip !== 'All' ? <button className="btn primary" onClick={() => setChip('All')}><span>Show all formats</span></button> : undefined}>
+          The list refreshes every few hours from the cricket data service.
+        </Empty>
+      )}
+      {shown.length > 0 && (
+        <ol className="stack grid" aria-label={`${tab}’s matches`}>
+          {shown.map((m, i) => <MatchCard key={m.id} m={m} color={CARD_COLORS[i % CARD_COLORS.length]} />)}
+        </ol>
+      )}
+    </Shell>
+  )
+}
