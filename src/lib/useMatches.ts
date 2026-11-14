@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { istDayStart } from './ist'
 import { supabase } from './supabase'
 import type { Match } from './types'
+import { useAuth } from './auth'
 
 /** Matches from a few days back (multi-day Tests) through tomorrow, from the filtered feed. Re-reads every minute (no API cost). */
 export function useMatchFeed(source: 'match_feed' | 'matches' = 'match_feed') {
@@ -26,15 +27,43 @@ export function useMatchFeed(source: 'match_feed' | 'matches' = 'match_feed') {
   return { matches, loading, error, reload: load }
 }
 
-export type DayTab = 'Today' | 'Tomorrow' | 'Live'
+export interface GameInfo { xiJoined: number; xiStatus: string | null; mine: boolean }
+
+/** Who joined each match's games, for the cards. Reads only (no contests are created here). */
+export function useGamesFor(matchIds: string[]) {
+  const { profile } = useAuth()
+  const [info, setInfo] = useState<Map<string, GameInfo>>(new Map())
+  const key = matchIds.join(',')
+  useEffect(() => {
+    if (!matchIds.length) { setInfo(new Map()); return }
+    let alive = true
+    void supabase.from('contests').select('match_id, game, status, entries(user_id)').in('match_id', matchIds).then(({ data }) => {
+      if (!alive) return
+      const m = new Map<string, GameInfo>()
+      for (const c of (data ?? []) as { match_id: string; game: string; status: string; entries: { user_id: string }[] }[]) {
+        const cur = m.get(c.match_id) ?? { xiJoined: 0, xiStatus: null, mine: false }
+        if (c.game === 'xi') { cur.xiJoined = c.entries.length; cur.xiStatus = c.status }
+        if (c.entries.some((e) => e.user_id === profile?.id)) cur.mine = true
+        m.set(c.match_id, cur)
+      }
+      setInfo(m)
+    })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, profile?.id])
+  return info
+}
+
+export type DayTab = 'Today' | 'Tomorrow' | 'Live' | 'Mine'
 export type FormatChip = 'All' | 'T20' | 'ODI' | 'Test' | 'Women'
 
-export function filterMatches(all: Match[], tab: DayTab, chip: FormatChip): Match[] {
+export function filterMatches(all: Match[], tab: DayTab, chip: FormatChip, mine?: Set<string>): Match[] {
   const t0 = istDayStart(0).getTime(), t1 = istDayStart(1).getTime(), t2 = istDayStart(2).getTime()
   const live = (m: Match) => m.started && !m.ended
   const byTab = all.filter((m) => {
     const s = new Date(m.starts_at).getTime()
     if (tab === 'Live') return live(m)
+    if (tab === 'Mine') return mine?.has(m.id) ?? false
     if (tab === 'Tomorrow') return s >= t1 && s < t2
     return (s >= t0 && s < t1) || live(m)
   })

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { isLive, scoreFor, scoreText, shortTeam } from '../lib/cricket'
 import { istDate, istTime, untilText } from '../lib/ist'
 import type { Match } from '../lib/types'
+import type { GameInfo } from '../lib/useMatches'
 import { TeamBadge } from './TeamBadge'
 
 function statusPills(m: Match): string[] {
@@ -15,7 +16,7 @@ function statusPills(m: Match): string[] {
   return [`Starts in ${untilText(m.starts_at)}`]
 }
 
-export function MatchCard({ m, color }: { m: Match; color: string }) {
+export function MatchCard({ m, color, games }: { m: Match; color: string; games?: GameInfo }) {
   const live = isLive(m)
   const city = (m.venue ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   return (
@@ -39,6 +40,8 @@ export function MatchCard({ m, color }: { m: Match; color: string }) {
         <div className="meta">
           {statusPills(m).map((p) => <span key={p} className="m">{p}</span>)}
           {m.is_women && <span className="m">Women</span>}
+          {games && games.xiJoined > 0 && <span className="m">Playing XI: <span className="num">{games.xiJoined}</span> joined</span>}
+          {games?.mine && <span className="m you">You’re in</span>}
         </div>
       </Link>
     </li>

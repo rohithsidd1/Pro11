@@ -2,15 +2,15 @@
 
 Cricket games for the family. React + Vite + TypeScript PWA, Supabase backend, hosted on Netlify. Everything runs on free tiers.
 
-**Build progress:** Step 3 of 7, Wallet ✅
+**Build progress:** Step 4 of 7, Game 1: Predict the Playing XI ✅
 
 | Step | What | Status |
 |---|---|---|
 | 1 | Design system, app shell, database, admin-relayed sign-in, members | ✅ |
 | 2 | Cricket data sync (90-credit cap), match list, match screen | ✅ |
-| 3 | Wallet: UPI pay link + QR, screenshot reading, approvals, withdrawals | ✅ This drop |
+| 3 | Wallet: UPI pay link + QR, screenshot reading, approvals, withdrawals | ✅ |
 | 4 | Game 1: Predict the XI, end to end | |
-| 5 | Game 2: Fantasy XI, end to end | |
+| 5 | Game 2: Fantasy XI, end to end | Next |
 | 6 | Admin rules and settings, notifications, ranks, history, backups | |
 | 7 | Tablet/desktop polish, final checks | |
 
@@ -119,6 +119,44 @@ CricketData blocks requests from Supabase's servers, so the calls go through a s
 - Admin → Cricket data: change the filters (for example turn on Domestic), the limit, pause syncing
 - Set the daily limit to a number you've already reached and tap Refresh: the call is skipped and logged, not made
 - Supabase → **Integrations → Cron** (or Database → Cron): the `pro11-cricket-tick` job runs every hour
+
+---
+
+## Step 4 setup: Game 1, Predict the Playing XI
+
+1. **Database:** SQL Editor → paste `supabase/migrations/20261114000004_game1.sql` → Run (choose Run if it warns).
+   Adds games, entries and picks, and two background jobs: lock/refund every 5 minutes (pure SQL, free) and data sync every 15 minutes.
+2. **Sync function changed:** deploy it again (fresh access token, delete it afterwards):
+   ```bash
+   export SUPABASE_ACCESS_TOKEN=sbp_...
+   npx supabase functions deploy sync-cricket --no-verify-jwt --project-ref mdtqgovuodwspxztsvps
+   unset SUPABASE_ACCESS_TOKEN
+   ```
+3. **App:** copy the new files in and push. Netlify deploys by itself.
+
+### How Game 1 works
+- Every match has a Predict the XI game, created the first time someone opens the match, with the default fee (Game rules).
+- **Join:** the fee leaves your wallet. You need enough balance; there's an "Add ₹X to join" shortcut.
+  Joining loads the squads once for that match (about 10 credits). You can leave before the lock and get the fee back.
+- **Pick:** up to 11 per team, saved as you go, editable until the lock (toss = start − 30 min by default).
+  Other people's picks are hidden until the lock, for everyone including the admin.
+- **Lock** (automatic, every 5 minutes): fewer than the minimum players → cancelled and everyone refunded.
+- **Playing XI:** the sync checks the squad once after the toss. If CricketData flags exactly 11 per side, the XI is set and
+  the game scores itself. If not (likely; it isn't documented), you get "Confirm the Playing XI" on the dashboard:
+  Match control → Edit Playing XI → tick 11 per team → Save. Saving both teams scores the game.
+- **Score:** 1 point per correct player, +5 for a perfect side, +10 more if both are perfect (all editable in Game rules).
+- **Pay out:** you press "Finish and pay out". Winner takes the pot; ties split equally (leftover rupee to the earliest
+  entry) or earliest entry wins, per Game rules. Cancel and refund works any time before payout.
+- The first squad call logs CricketData's player fields in Cricket data → Recent API calls ("Player fields: …").
+  Send me that line: if it shows a playing flag, the XI will fill itself in.
+
+### What to test in step 4
+- Two people join a match's Predict the XI with enough balance; a third without enough sees "Add ₹X to join".
+- Pick 22 (try a 12th from one team: blocked), save, leave and rejoin, check the wallet entries and refunds.
+- Before the lock, each person sees only their own picks.
+- A game with one player at the lock is cancelled and refunded automatically.
+- After the lock: Admin → Games needing you → Edit Playing XI → tick 11 + 11 → scores appear; results screen marks each pick.
+- Finish and pay out; winners' wallets go up, everyone gets a notification; a second payout is refused.
 
 ---
 

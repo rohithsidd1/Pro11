@@ -94,6 +94,8 @@ export interface Match {
   squad_fetched_at: string | null
   info_fetched_at: string | null
   last_synced_at: string
+  xi_checked_at?: string | null
+  xi_source?: 'api' | 'admin' | null
 }
 
 export interface MatchPlayer {
@@ -105,6 +107,7 @@ export interface MatchPlayer {
   api_role: string | null
   img: string | null
   in_xi: boolean | null
+  manual?: boolean
 }
 
 export interface DataSettings {
@@ -145,4 +148,23 @@ export interface MoneySettings {
   upi_id: string; payee_name: string; admin_phone: string; admin_name: string
   min_topup: number; max_topup: number; min_withdrawal: number
   accept_phonepe: boolean; accept_gpay: boolean; accept_paytm: boolean; accept_other_upi: boolean
+}
+
+export type GameKind = 'xi' | 'fantasy'
+export type ContestStatus = 'open' | 'locked' | 'scored' | 'paid' | 'cancelled'
+export interface Contest {
+  id: string; match_id: string; game: GameKind; fee: number; enabled: boolean; status: ContestStatus
+  lock_at: string; cancel_reason: string | null; scored_at: string | null; settled_at: string | null
+}
+export interface Entry {
+  id: string; contest_id: string; user_id: string; points: number; correct: number; rank: number | null; payout: number
+  created_at: string; updated_at: string
+  who?: { name: string; color: string } | null
+}
+export interface XiPick { entry_id: string; player_id: string; team: string }
+
+export interface GameSettings {
+  xi_points_per_correct: number; xi_perfect_team_bonus: number; xi_both_perfect_bonus: number
+  xi_lock_at: 'toss' | 'start'; toss_minutes_before: number; tie_rule: 'split' | 'earliest'
+  default_fee_xi: number; default_fee_fantasy: number; min_players: number
 }

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { istDayName, istTime } from '../../lib/ist'
+import { shortTeam } from '../../lib/cricket'
 import { Link } from 'react-router-dom'
 import { CodeCard } from '../../components/CodeCard'
 import { Icon } from '../../components/Icon'
@@ -18,6 +20,11 @@ export function AdminHome() {
   const { used, settings } = useDataStatus()
   const money = useMoneyQueue(true)
   const [members, setMembers] = useState(0)
+  const [needs, setNeeds] = useState<{ id: string; match_id: string; status: string; lock_at: string; matches: { team_a: string; team_b: string; label: string | null } }[]>([])
+  useEffect(() => {
+    void supabase.from('contests').select('id, match_id, status, lock_at, matches!inner(team_a, team_b, label)').in('status', ['locked', 'scored']).order('lock_at')
+      .then(({ data }) => setNeeds((data as never) ?? []))
+  }, [])
   useEffect(() => {
     void supabase.from('profiles').select('id', { count: 'exact', head: true }).then(({ count }) => setMembers(count ?? 0))
   }, [])
@@ -56,6 +63,22 @@ export function AdminHome() {
         </>
       )}
 
+      {needs.length > 0 && (
+        <>
+          <div className="sec"><h2>Games needing you</h2></div>
+          <div className="list" style={{ maxWidth: 560 }}>
+            {needs.map((c) => (
+              <Link key={c.id} to={`/admin/match/${c.match_id}`} className="row">
+                <span className="ic" style={{ ['--b' as string]: 'var(--warn-bg)' }}><Icon name={c.status === 'scored' ? 'trophy' : 'user'} /></span>
+                <span><span className="rt">{shortTeam(c.matches.team_a)} vs {shortTeam(c.matches.team_b)}</span>
+                  <span className="rs">{c.status === 'scored' ? 'Scored. Check and pay out.' : `Locked ${istDayName(c.lock_at).toLowerCase()} ${istTime(c.lock_at)}. Confirm the Playing XI.`}</span></span>
+                <Icon name="chev" />
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+
       <div className="sec"><h2>Manage</h2></div>
       <div className="list" style={{ maxWidth: 560 }}>
         {MANAGE.map((m) => (
@@ -69,7 +92,6 @@ export function AdminHome() {
 
       <div className="sec"><h2>Safety</h2></div>
       <button className="btn danger" onClick={signEveryoneOut}><Icon name="logout" /><span>Sign everyone out</span></button>
-      <p className="fine">Games join this dashboard in the next steps.</p>
     </Shell>
   )
 }
@@ -78,6 +100,7 @@ const MANAGE: { to: string; icon: IconName; label: string; sub: string }[] = [
   { to: '/admin/members', icon: 'user', label: 'Members', sub: 'Roles, blocking, adjust a wallet' },
   { to: '/admin/balances', icon: 'wallet', label: 'Balances', sub: 'Money you’re holding, export the ledger' },
   { to: '/admin/money', icon: 'sliders', label: 'Money settings', sub: 'UPI ID, limits, accepted apps' },
+  { to: '/admin/rules', icon: 'trophy', label: 'Game rules', sub: 'Points, lock time, fees, ties' },
   { to: '/admin/matches', icon: 'stumps', label: 'Matches', sub: 'Show or hide matches' },
   { to: '/admin/data', icon: 'gauge', label: 'Cricket data', sub: 'API credits and syncing' },
 ]

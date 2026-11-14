@@ -4,6 +4,7 @@ import { Empty } from '../components/Empty'
 import { Icon } from '../components/Icon'
 import { Shell } from '../components/Shell'
 import { TeamBadge } from '../components/TeamBadge'
+import { XiGameCard } from '../components/XiGameCard'
 import { callFunction } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { isLive, scoreFor, scoreText, shortTeam } from '../lib/cricket'
@@ -96,11 +97,16 @@ export function MatchPage() {
             </div>
           </section>
 
-          <div className="sec"><h2>Games</h2></div>
-          <div className="panel" style={{ background: 'var(--soft)' }}>
-            <p className="rt">Predict the XI and Fantasy XI open here soon</p>
-            <p className="rs">They arrive in the next updates.</p>
-          </div>
+          <ol className="stack games" aria-label="Games for this match">
+            <XiGameCard match={m} />
+            <li className="card game" style={{ ['--c' as string]: 'var(--coral)' }}>
+              <span className="tab l">Game <span className="num">2</span></span>
+              <span className="grip" aria-hidden="true" />
+              <h3>Fantasy XI</h3>
+              <p className="desc">Pick 11 players, a captain (2×) and a vice-captain (1.5×). Arrives in the next update.</p>
+            </li>
+          </ol>
+          <p className="fine">A game needs at least 2 players by the lock. If it doesn’t fill, it’s cancelled and your entry goes back to your wallet.</p>
 
           {isAdmin && (
             <>

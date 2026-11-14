@@ -12,6 +12,11 @@ import { Welcome } from './pages/auth/Welcome'
 import { ComingSoon } from './pages/ComingSoon'
 import { Home } from './pages/Home'
 import { MatchPage } from './pages/MatchPage'
+import { PickXi } from './pages/game/PickXi'
+import { XiResults } from './pages/game/XiResults'
+import { MatchControl } from './pages/admin/MatchControl'
+import { EditXi } from './pages/admin/EditXi'
+import { GameRules } from './pages/admin/GameRules'
 import { Wallet } from './pages/wallet/Wallet'
 import { AddMoney } from './pages/wallet/AddMoney'
 import { PaymentDetail } from './pages/wallet/PaymentDetail'
@@ -34,6 +39,8 @@ export default function App() {
       <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
       <Route path="/me" element={<RequireAuth><Profile /></RequireAuth>} />
       <Route path="/match/:id" element={<RequireAuth><MatchPage /></RequireAuth>} />
+      <Route path="/match/:id/xi" element={<RequireAuth><PickXi /></RequireAuth>} />
+      <Route path="/match/:id/xi/results" element={<RequireAuth><XiResults /></RequireAuth>} />
       <Route path="/wallet" element={<RequireAuth><Wallet /></RequireAuth>} />
       <Route path="/wallet/add" element={<RequireAuth><AddMoney /></RequireAuth>} />
       <Route path="/wallet/payment/:id" element={<RequireAuth><PaymentDetail /></RequireAuth>} />
@@ -50,6 +57,9 @@ export default function App() {
       <Route path="/admin/withdrawals" element={<RequireAuth><RequireAdmin><Withdrawals /></RequireAdmin></RequireAuth>} />
       <Route path="/admin/balances" element={<RequireAuth><RequireAdmin><Balances /></RequireAdmin></RequireAuth>} />
       <Route path="/admin/money" element={<RequireAuth><RequireAdmin><MoneySettings /></RequireAdmin></RequireAuth>} />
+      <Route path="/admin/match/:id" element={<RequireAuth><RequireAdmin><MatchControl /></RequireAdmin></RequireAuth>} />
+      <Route path="/admin/match/:id/xi" element={<RequireAuth><RequireAdmin><EditXi /></RequireAdmin></RequireAuth>} />
+      <Route path="/admin/rules" element={<RequireAuth><RequireAdmin><GameRules /></RequireAdmin></RequireAuth>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

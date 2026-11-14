@@ -8,9 +8,10 @@ import { MatchCard } from '../components/MatchCard'
 import { Shell } from '../components/Shell'
 import { useAuth } from '../lib/auth'
 import { CARD_COLORS } from '../lib/cricket'
-import { filterMatches, useMatchFeed, type DayTab, type FormatChip } from '../lib/useMatches'
+import { filterMatches, useGamesFor, useMatchFeed, type DayTab, type FormatChip } from '../lib/useMatches'
 
-const TABS: DayTab[] = ['Today', 'Tomorrow', 'Live']
+const TABS: DayTab[] = ['Today', 'Tomorrow', 'Live', 'Mine']
+const TAB_LABEL: Record<DayTab, string> = { Today: 'Today', Tomorrow: 'Tomorrow', Live: 'Live', Mine: 'My games' }
 const CHIPS: FormatChip[] = ['All', 'T20', 'ODI', 'Test', 'Women']
 
 export function Home() {
@@ -19,7 +20,9 @@ export function Home() {
   const { balance, loading: walletLoading } = useWallet()
   const [tab, setTab] = useState<DayTab>('Today')
   const [chip, setChip] = useState<FormatChip>('All')
-  const shown = filterMatches(matches, tab, chip)
+  const games = useGamesFor(matches.map((m) => m.id))
+  const mineSet = new Set([...games.entries()].filter(([, g]) => g.mine).map(([id]) => id))
+  const shown = filterMatches(matches, tab, chip, mineSet)
   const todayCount = filterMatches(matches, 'Today', 'All').length
   const liveCount = filterMatches(matches, 'Live', 'All').length
 
@@ -42,7 +45,7 @@ export function Home() {
         <nav className="tabs" aria-label="Match lists">
           {TABS.map((t) => (
             <button key={t} className="tab-pill" aria-pressed={tab === t} onClick={() => setTab(t)}>
-              <span className="tx">{t}</span>
+              <span className="tx">{TAB_LABEL[t]}</span>
             </button>
           ))}
         </nav>
@@ -59,14 +62,14 @@ export function Home() {
         </Empty>
       )}
       {!error && !loading && shown.length === 0 && (
-        <Empty icon="stumps" title={tab === 'Live' ? 'Nothing live right now' : `No ${chip === 'All' ? '' : chip === 'Women' ? 'women’s ' : `${chip} `}matches ${tab.toLowerCase()}`}
+        <Empty icon="stumps" title={tab === 'Mine' ? 'You haven’t joined a game yet' : tab === 'Live' ? 'Nothing live right now' : `No ${chip === 'All' ? '' : chip === 'Women' ? 'women’s ' : `${chip} `}matches ${tab.toLowerCase()}`}
           action={chip !== 'All' ? <button className="btn primary" onClick={() => setChip('All')}><span>Show all formats</span></button> : undefined}>
           The list refreshes every few hours from the cricket data service.
         </Empty>
       )}
       {shown.length > 0 && (
         <ol className="stack grid" aria-label={`${tab}’s matches`}>
-          {shown.map((m, i) => <MatchCard key={m.id} m={m} color={CARD_COLORS[i % CARD_COLORS.length]} />)}
+          {shown.map((m, i) => <MatchCard key={m.id} m={m} color={CARD_COLORS[i % CARD_COLORS.length]} games={games.get(m.id)} />)}
         </ol>
       )}
     </Shell>

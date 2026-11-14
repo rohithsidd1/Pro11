@@ -1,10 +1,11 @@
 // Pro11 cricket data sync. Called by:
 //   • the hourly database job (header x-sync-token) with { mode: "tick" }
 //   • the admin app (signed-in admin) with { mode: "list" | "fixtures" | "squad" | "info", matchId? }
+//   • a member who just joined a game with { mode: "squad-for-entry", matchId } (only fetches once per match)
 // Every call to CricketData is checked against the daily credit cap and logged with its real cost.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminClient, cors, json } from '../_shared/util.ts'
-import { parseMatch, parseSquad, type MatchRow, type TeamRow } from '../_shared/cricket.ts'
+import { parseMatch, parseSquad, parseXi, squadFieldNames, type MatchRow, type TeamRow } from '../_shared/cricket.ts'
 
 const API = 'https://api.cricapi.com/v1'
 // What we expect each call to cost. The API reports the real figure (info.hitsUsed) and we log that.
@@ -19,18 +20,21 @@ interface Ctx { db: SupabaseClient; s: DataSettings; trigger: Trigger }
 
 const utcDay = () => new Date().toISOString().slice(0, 10)
 
-async function authorize(req: Request, db: SupabaseClient): Promise<Trigger | null> {
+interface Caller { trigger: Trigger; userId: string | null; isAdmin: boolean }
+
+async function authorize(req: Request, db: SupabaseClient): Promise<Caller | null> {
   const token = req.headers.get('x-sync-token')
   if (token) {
     const { data } = await db.rpc('sync_token_ok', { p_token: token })
-    return data === true ? 'auto' : null
+    return data === true ? { trigger: 'auto', userId: null, isAdmin: false } : null
   }
   const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
   if (!jwt) return null
   const { data: u } = await db.auth.getUser(jwt)
   if (!u?.user) return null
   const { data: p } = await db.from('profiles').select('role, blocked').eq('id', u.user.id).maybeSingle()
-  return p && p.role === 'admin' && !p.blocked ? 'admin' : null
+  if (!p || p.blocked) return null
+  return { trigger: p.role === 'admin' ? 'admin' : 'auto', userId: u.user.id, isAdmin: p.role === 'admin' }
 }
 
 async function log(ctx: Ctx, endpoint: string, matchId: string | null, credits: number, ok: boolean, note: string | null) {
@@ -161,14 +165,60 @@ async function syncInfo(ctx: Ctx, matchId: string) {
   return { updated: true }
 }
 
-async function syncSquad(ctx: Ctx, matchId: string) {
+async function syncSquad(ctx: Ctx, matchId: string, opts: { xiCheck?: boolean } = {}) {
   const data = await api(ctx, 'match_squad', { id: matchId }, matchId)
-  const rows = parseSquad(matchId, data, new Date().toISOString())
-  if (!rows.length) return { players: 0 }
+  const now = new Date().toISOString()
+  const rows = parseSquad(matchId, data, now)
+  const fields = squadFieldNames(data)
+  if (fields) await ctx.db.from('api_calls').insert({ endpoint: 'match_squad', match_id: matchId, credits: 0, ok: true, trigger: ctx.trigger, note: `Player fields: ${fields}`.slice(0, 200) })
+  if (opts.xiCheck) await ctx.db.from('matches').update({ xi_checked_at: now }).eq('id', matchId)
+  if (!rows.length) return { players: 0, xi: false }
   const { error } = await ctx.db.from('match_players').upsert(rows)
   if (error) throw error
-  await ctx.db.from('matches').update({ squad_fetched_at: new Date().toISOString() }).eq('id', matchId)
-  return { players: rows.length }
+  await ctx.db.from('matches').update({ squad_fetched_at: now }).eq('id', matchId)
+
+  // Playing XI, if the API flags it (exactly 11 a side). Never overrides an XI the admin set.
+  const xi = parseXi(data)
+  if (!xi) return { players: rows.length, xi: false }
+  const { data: m } = await ctx.db.from('matches').select('xi_source').eq('id', matchId).maybeSingle()
+  if (m?.xi_source === 'admin') return { players: rows.length, xi: false }
+  for (const [team, ids] of xi) {
+    await ctx.db.from('match_players').update({ in_xi: false }).eq('match_id', matchId).eq('team', team)
+    await ctx.db.from('match_players').update({ in_xi: true }).eq('match_id', matchId).in('player_id', [...ids])
+  }
+  await ctx.db.from('matches').update({ xi_source: 'api' }).eq('id', matchId)
+  await ctx.db.rpc('score_match_xi', { p_match: matchId })
+  return { players: rows.length, xi: true }
+}
+
+/** Squads for games people joined, and one Playing XI check after the toss. */
+async function syncGames(ctx: Ctx) {
+  const out: Record<string, unknown> = {}
+  const now = Date.now()
+  const { data: contests } = await ctx.db.from('contests')
+    .select('match_id, status, lock_at, entries(count), matches!inner(starts_at, squad_fetched_at, xi_checked_at, xi_source, fantasy_ok, ended)')
+    .in('status', ['open', 'locked'])
+  // deno-lint-ignore no-explicit-any
+  const rows = (contests ?? []) as any[]
+  const seen = new Set<string>()
+  for (const c of rows) {
+    if (seen.has(c.match_id)) continue
+    seen.add(c.match_id)
+    const m = c.matches
+    const joined = c.entries?.[0]?.count ?? 0
+    const startsIn = new Date(m.starts_at).getTime() - now
+    if (!m.fantasy_ok || m.ended) continue
+    // squads: someone joined, within 36 h of the start, never fetched
+    if (joined > 0 && !m.squad_fetched_at && startsIn < 36 * 36e5) {
+      out[`squad ${c.match_id}`] = await syncSquad(ctx, c.match_id)
+      continue
+    }
+    // Playing XI: once, 10+ minutes after the lock, if the XI isn't set yet
+    if (c.status === 'locked' && !m.xi_checked_at && !m.xi_source && now > new Date(c.lock_at).getTime() + 10 * 60e3) {
+      out[`xi ${c.match_id}`] = await syncSquad(ctx, c.match_id, { xiCheck: true })
+    }
+  }
+  return out
 }
 
 const hoursSince = (iso: string | null) => (iso ? (Date.now() - new Date(iso).getTime()) / 36e5 : Infinity)
@@ -181,7 +231,8 @@ async function tick(ctx: Ctx) {
   if (ctx.s.fixtures_pages > 0 && hoursSince(ctx.s.last_fixtures_sync_at) >= ctx.s.fixtures_refresh_hours - 0.09) {
     out.fixtures = await syncFixtures(ctx)
   }
-  // Step 4 adds: fetch squads for matches with open games, and the Playing XI after the toss.
+  const games = await syncGames(ctx)
+  if (Object.keys(games).length) out.games = games
   return Object.keys(out).length ? out : { skipped: 'Nothing due' }
 }
 
@@ -190,19 +241,31 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Use POST.' }, 405)
   try {
     const db = adminClient()
-    const trigger = await authorize(req, db)
-    if (!trigger) return json({ error: 'Not allowed.' }, 401)
+    const caller = await authorize(req, db)
+    if (!caller) return json({ error: 'Not allowed.' }, 401)
 
     const { data: s, error } = await db.from('app_settings').select('*').eq('id', 1).single()
     if (error || !s) return json({ error: 'Settings missing. Run the step 2 migration.' }, 500)
-    const ctx: Ctx = { db, s: s as DataSettings, trigger }
+    const ctx: Ctx = { db, s: s as DataSettings, trigger: caller.trigger }
 
     const body = (await req.json().catch(() => ({}))) as { mode?: string; matchId?: string }
     const mode = body.mode ?? 'tick'
     const matchId = body.matchId ? String(body.matchId) : null
 
-    if (mode === 'tick') return json({ ok: true, result: await tick(ctx) })
-    if (trigger !== 'admin') return json({ error: 'Not allowed.' }, 401)
+    if (mode === 'tick' && !caller.userId) return json({ ok: true, result: await tick(ctx) })
+
+    // A member who joined a game can trigger the one-time squad fetch for that match.
+    if (mode === 'squad-for-entry' && matchId && caller.userId) {
+      const { data: m } = await db.from('matches').select('squad_fetched_at, fantasy_ok').eq('id', matchId).maybeSingle()
+      if (!m) return json({ error: 'Match not found.' }, 404)
+      if (m.squad_fetched_at) return json({ ok: true, result: { players: 'already loaded' } })
+      const { data: mine } = await db.from('entries').select('id, contests!inner(match_id)').eq('user_id', caller.userId).eq('contests.match_id', matchId).limit(1)
+      if (!mine?.length) return json({ error: 'Join the game first.' }, 403)
+      if (!m.fantasy_ok) return json({ error: 'The data service has no squads for this match. Ask the admin to add them.' }, 422)
+      return json({ ok: true, result: await syncSquad(ctx, matchId) })
+    }
+
+    if (!caller.isAdmin) return json({ error: 'Not allowed.' }, 401)
     if (mode === 'list') return json({ ok: true, result: await syncList(ctx) })
     if (mode === 'fixtures') return json({ ok: true, result: await syncFixtures(ctx) })
     if (mode === 'info' && matchId) return json({ ok: true, result: await syncInfo(ctx, matchId) })

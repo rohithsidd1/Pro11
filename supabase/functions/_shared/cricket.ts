@@ -101,6 +101,44 @@ export interface PlayerRow {
   img: string | null; updated_at: string
 }
 
+// CricketData doesn't document a Playing XI flag. If a squad response carries one of these, we use it.
+const PLAYING_KEYS = ['playing11', 'playingXI', 'playingxi', 'isPlaying', 'is_playing', 'inPlaying11', 'playing', 'inXI', 'starting11']
+
+/** Reads a "playing" flag from a squad player, if the API sent one. */
+export function playingFlag(p: Raw): boolean | null {
+  for (const k of PLAYING_KEYS) {
+    if (k in p) {
+      const v = p[k]
+      if (typeof v === 'boolean') return v
+      if (v === 1 || v === '1' || v === 'true' || v === 'yes' || v === 'Y') return true
+      if (v === 0 || v === '0' || v === 'false' || v === 'no' || v === 'N') return false
+    }
+  }
+  if ('substitute' in p && typeof p.substitute === 'boolean') return !p.substitute
+  return null
+}
+
+/** Field names on the first player, logged so we can see what CricketData really sends. */
+export function squadFieldNames(data: unknown): string {
+  const sides: Raw[] = Array.isArray(data) ? data : []
+  const first = sides.find((s) => Array.isArray(s?.players) && s.players.length)?.players?.[0]
+  return first && typeof first === 'object' ? Object.keys(first).join(',') : ''
+}
+
+/** Playing XI from a squad response: only if exactly 11 per team are flagged. */
+export function parseXi(data: unknown): Map<string, Set<string>> | null {
+  const sides: Raw[] = Array.isArray(data) ? data : []
+  const out = new Map<string, Set<string>>()
+  for (const side of sides) {
+    const team = String(side?.teamName ?? side?.name ?? '').trim()
+    const players: Raw[] = Array.isArray(side?.players) ? side.players : []
+    const xi = new Set(players.filter((p) => p?.id && playingFlag(p) === true).map((p) => String(p.id)))
+    if (!team || xi.size !== 11) return null
+    out.set(team, xi)
+  }
+  return out.size === 2 ? out : null
+}
+
 export function parseSquad(matchId: string, data: unknown, nowIso: string): PlayerRow[] {
   const sides: Raw[] = Array.isArray(data) ? data : []
   const rows: PlayerRow[] = []

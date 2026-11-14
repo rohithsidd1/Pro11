@@ -78,6 +78,7 @@ export function AdminMatches() {
                 <span className={shown ? 'tag ok' : 'tag warn'}>{shown ? 'Shown' : 'Hidden'}</span>
                 {m.squad_fetched_at && <span className="tag">Squads loaded</span>}
               </div>
+              <Link className="btn sm" style={{ marginTop: 12 }} to={`/admin/match/${m.id}`}><Icon name="trophy" small /><span>Games and Playing XI</span></Link>
               <div className="seg sm" style={{ marginTop: 12, maxWidth: 420 }} role="group" aria-label="Visibility">
                 {(['auto', 'shown', 'hidden'] as const).map((v) => (
                   <button key={v} aria-pressed={m.visibility === v} onClick={() => setVis(m, v)}>
