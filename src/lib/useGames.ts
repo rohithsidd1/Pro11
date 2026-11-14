@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from './auth'
 import { supabase } from './supabase'
-import type { Contest, Entry, GameKind, Match, MatchPlayer, XiPick } from './types'
+import type { Contest, Entry, FantasyPick, GameKind, Match, MatchPlayer, PlayerPoints, XiPick } from './types'
 
 /** One match's contest for a game: the contest (created on first look), everyone who joined, your entry and your picks. */
 export function useContest(matchId: string, game: GameKind) {
@@ -9,6 +9,7 @@ export function useContest(matchId: string, game: GameKind) {
   const [contest, setContest] = useState<Contest | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
   const [picks, setPicks] = useState<XiPick[]>([])
+  const [team, setTeam] = useState<FantasyPick[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -18,11 +19,14 @@ export function useContest(matchId: string, game: GameKind) {
     const ct = c as Contest
     const [en, pk] = await Promise.all([
       supabase.from('entries').select('*, who:profiles!entries_user_id_fkey(name, color)').eq('contest_id', ct.id).order('created_at'),
-      game === 'xi' ? supabase.from('xi_picks').select('*, entries!inner(contest_id)').eq('entries.contest_id', ct.id) : Promise.resolve({ data: [] }),
+      game === 'xi'
+        ? supabase.from('xi_picks').select('*, entries!inner(contest_id)').eq('entries.contest_id', ct.id)
+        : supabase.from('fantasy_picks').select('*, entries!inner(contest_id)').eq('entries.contest_id', ct.id),
     ])
     setContest(ct)
     setEntries((en.data as Entry[] | null) ?? [])
-    setPicks(((pk.data as (XiPick & { entries?: unknown })[] | null) ?? []).map(({ entry_id, player_id, team }) => ({ entry_id, player_id, team })))
+    if (game === 'xi') setPicks(((pk.data as (XiPick & { entries?: unknown })[] | null) ?? []).map(({ entry_id, player_id, team }) => ({ entry_id, player_id, team })))
+    else setTeam(((pk.data as (FantasyPick & { entries?: unknown })[] | null) ?? []).map(({ entry_id, player_id, team, role, captain, vice }) => ({ entry_id, player_id, team, role, captain, vice })))
     setError(null); setLoading(false)
   }, [matchId, game])
 
@@ -36,7 +40,8 @@ export function useContest(matchId: string, game: GameKind) {
 
   const mine = entries.find((e) => e.user_id === profile?.id) ?? null
   const myPicks = mine ? picks.filter((p) => p.entry_id === mine.id) : []
-  return { contest, entries, picks, mine, myPicks, loading, error, reload: load }
+  const myTeam = mine ? team.filter((p) => p.entry_id === mine.id) : []
+  return { contest, entries, picks, team, mine, myPicks, myTeam, loading, error, reload: load }
 }
 
 export function useMatchAndSquad(matchId: string) {
@@ -76,4 +81,30 @@ export function contestSummary(c: Contest | null, joined: number, minPlayers: nu
     : c.status === 'paid' ? 'Final'
     : `Cancelled: ${c.cancel_reason ?? 'refunded'}`
   return { pot, line }
+}
+
+/** Fantasy points per player for a match (live or final). */
+export function usePlayerPoints(matchId: string) {
+  const [points, setPoints] = useState<Map<string, PlayerPoints>>(new Map())
+  useEffect(() => {
+    const load = () => supabase.from('player_points').select('*').eq('match_id', matchId)
+      .then(({ data }) => setPoints(new Map(((data as PlayerPoints[] | null) ?? []).map((p) => [p.player_id, p]))))
+    void load()
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') void load() }, 60000)
+    return () => window.clearInterval(t)
+  }, [matchId])
+  return points
+}
+
+/** Team rules from settings, with defaults. */
+export function teamRules(s: unknown) {
+  const r = (s ?? {}) as Partial<import('./types').TeamRules>
+  return {
+    maxPerSide: r.fx_max_per_side ?? 7,
+    roles: {
+      WK: [r.fx_wk_min ?? 1, r.fx_wk_max ?? 4], BAT: [r.fx_bat_min ?? 3, r.fx_bat_max ?? 6],
+      AR: [r.fx_ar_min ?? 1, r.fx_ar_max ?? 4], BOWL: [r.fx_bowl_min ?? 3, r.fx_bowl_max ?? 6],
+    } as Record<MatchPlayer['role'], [number, number]>,
+    captain: Number(r.fx_captain_mult ?? 2), vice: Number(r.fx_vice_mult ?? 1.5),
+  }
 }

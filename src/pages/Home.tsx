@@ -1,24 +1,29 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { pushAsked, pushPermission } from '../lib/push'
 import { rupees } from '../lib/money'
 import { useWallet } from '../lib/useWallet'
 import { Empty } from '../components/Empty'
 import { Icon } from '../components/Icon'
 import { MatchCard } from '../components/MatchCard'
 import { Shell } from '../components/Shell'
+import { Bell } from '../components/Bell'
 import { useAuth } from '../lib/auth'
 import { CARD_COLORS } from '../lib/cricket'
 import { filterMatches, useGamesFor, useMatchFeed, type DayTab, type FormatChip } from '../lib/useMatches'
 
-const TABS: DayTab[] = ['Today', 'Tomorrow', 'Live', 'Mine']
-const TAB_LABEL: Record<DayTab, string> = { Today: 'Today', Tomorrow: 'Tomorrow', Live: 'Live', Mine: 'My games' }
+const TAB_LABEL: Record<DayTab, string> = { Today: 'Today', Tomorrow: 'Tomorrow', Later: 'Day after', Live: 'Live', Mine: 'My games' }
 const CHIPS: FormatChip[] = ['All', 'T20', 'ODI', 'Test', 'Women']
 
 export function Home() {
-  const { profile } = useAuth()
-  const { matches, loading, error, reload } = useMatchFeed()
+  const { profile, settings } = useAuth()
+  const cfg = (settings ?? {}) as unknown as { days_ahead?: number; home_tab?: DayTab; app_name?: string }
+  const TABS: DayTab[] = cfg.days_ahead === 3 ? ['Today', 'Tomorrow', 'Later', 'Live', 'Mine'] : ['Today', 'Tomorrow', 'Live', 'Mine']
+  const navigate = useNavigate()
+  useEffect(() => { if (!pushAsked() && pushPermission() === 'default') navigate('/alerts') }, [navigate])
+  const { matches, loading, error, reload } = useMatchFeed('match_feed', cfg.days_ahead ?? 2)
   const { balance, loading: walletLoading } = useWallet()
-  const [tab, setTab] = useState<DayTab>('Today')
+  const [tab, setTab] = useState<DayTab>(cfg.home_tab === 'Mine' ? 'Mine' : 'Today')
   const [chip, setChip] = useState<FormatChip>('All')
   const games = useGamesFor(matches.map((m) => m.id))
   const mineSet = new Set([...games.entries()].filter(([, g]) => g.mine).map(([id]) => id))
@@ -30,12 +35,12 @@ export function Home() {
     <Shell title="Matches" kicker={profile ? `Hi ${profile.name.split(' ')[0]}` : undefined}
       actions={<>
         <Link to="/wallet" className="wallet-chip" aria-label={`Wallet, ${rupees(balance)}`}><Icon name="wallet" small /><span>{walletLoading ? '…' : rupees(balance)}</span></Link>
-        <button className="icon-btn" aria-label="Notifications"><Icon name="bell" /></button>
+        <Bell />
       </>}>
       <div className="hero-card">
         <div>
           <p className="kicker">Cricket</p>
-          <p className="brand">PRO11</p>
+          <p className="brand">{(cfg.app_name ?? 'Pro11').toUpperCase()}</p>
           <p className="lead"><span className="num">{todayCount}</span> {todayCount === 1 ? 'match' : 'matches'} today{liveCount ? <>, <span className="num">{liveCount}</span> live</> : ''}</p>
         </div>
         <svg className="ball" aria-hidden="true"><use href="#ball" /></svg>

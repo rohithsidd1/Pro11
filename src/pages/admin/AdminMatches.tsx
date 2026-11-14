@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Empty } from '../../components/Empty'
 import { Icon } from '../../components/Icon'
@@ -29,6 +29,8 @@ export function AdminMatches() {
   const [tab, setTab] = useState<'Today' | 'Tomorrow' | 'Live'>('Today')
   const [busy, setBusy] = useState(false)
   const list = filterMatches(matches, tab, 'All')
+  const [blocked, setBlocked] = useState<Set<string>>(new Set())
+  useEffect(() => { void supabase.from('blocked_series').select('series_id').then(({ data }) => setBlocked(new Set((data ?? []).map((r: { series_id: string }) => r.series_id)))) }, [])
 
   const setVis = async (m: Match, v: Visibility) => {
     const { error } = await supabase.rpc('admin_set_match_visibility', { p_id: m.id, p_visibility: v })
@@ -76,9 +78,12 @@ export function AdminMatches() {
               <div className="meta">
                 <span className="tag">{CAT[m.category]}{m.is_women ? ', women' : ''}</span>
                 <span className={shown ? 'tag ok' : 'tag warn'}>{shown ? 'Shown' : 'Hidden'}</span>
-                {m.squad_fetched_at && <span className="tag">Squads loaded</span>}
+                {m.series_id && blocked.has(m.series_id) ? <span className="tag bad">League removed: no data</span>
+                  : m.squad_fetched_at ? <span className="tag">Squads loaded</span>
+                  : m.fantasy_ok && m.has_squad ? <span className="tag ok">Game data</span>
+                  : <span className="tag warn">No game data</span>}
               </div>
-              <Link className="btn sm" style={{ marginTop: 12 }} to={`/admin/match/${m.id}`}><Icon name="trophy" small /><span>Games and Playing XI</span></Link>
+              <Link className="btn sm" style={{ marginTop: 12 }} to={`/admin/match/${m.id}`}><Icon name="trophy" small /><span>Game status</span></Link>
               <div className="seg sm" style={{ marginTop: 12, maxWidth: 420 }} role="group" aria-label="Visibility">
                 {(['auto', 'shown', 'hidden'] as const).map((v) => (
                   <button key={v} aria-pressed={m.visibility === v} onClick={() => setVis(m, v)}>

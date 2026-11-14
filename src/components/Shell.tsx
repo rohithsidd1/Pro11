@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { usePendingCodeCount } from '../lib/usePendingCodes'
 import { useMoneyQueue } from '../lib/useWallet'
 import { Avatar } from './Avatar'
+import { OfflineBanner } from './OfflineBanner'
 import { Icon, type IconName } from './Icon'
 
 type NavItem = { to: string; icon: IconName; label: string; end?: boolean; count?: number }
@@ -74,7 +75,8 @@ export function Shell({ title, kicker, actions, back, children }: {
           </div>
           <div className="top-actions">{actions}</div>
         </header>
-        <main className="page">{children}</main>
+        <main className="page">
+        <OfflineBanner />{children}</main>
       </div>
 
       <nav className="bottom-nav" aria-label="Main">

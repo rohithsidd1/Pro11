@@ -509,3 +509,47 @@ svg.i.s { width: 18px; height: 18px; }
 .m.you { background: var(--ink); color: var(--paper); }
 
 .pick-wrap { max-width: 760px; padding-bottom: 24px; }
+
+/* fantasy captain picks */
+.cv { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--paper); font-family: var(--display); font-size: 13px; font-weight: 800; }
+.cv.on { background: var(--ink); color: var(--paper); }
+.cbadge { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 11px; font-weight: 800; margin-left: 6px; }
+
+/* Step 6: notifications, help */
+.bell { position: relative; text-decoration: none; }
+.bell-n { position: absolute; top: -2px; right: -2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--live);
+  color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; border: 2px solid var(--cream); line-height: 1; }
+.notice { width: 100%; text-align: left; color: inherit; border: 0; }
+.notice.unread { background: var(--paper); box-shadow: inset 3px 0 0 var(--ink); }
+.notice:not(.unread) .rt { font-weight: 500; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--live); justify-self: end; }
+.faq summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 28px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-family: var(--num); font-size: 22px; font-weight: 500; }
+.faq[open] summary::after { content: "−"; }
+.row.nolead { grid-template-columns: 1fr auto; }
+
+/* Step 7: onboarding, offline, previews */
+.center-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px var(--g); }
+.onboard { max-width: 420px; text-align: center; }
+.onboard .lead { margin-top: 8px; }
+.onboard-ic { width: 96px; height: 96px; border-radius: 50%; background: var(--lemon); border: 1.5px solid var(--ink); display: grid; place-items: center; margin: 0 auto 18px; }
+.onboard-ic svg { width: 44px; height: 44px; }
+.preview-note { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center; text-align: left; margin-top: 20px; }
+.offline { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 600; }
+.pline { display: grid; gap: 6px; margin-top: 12px; }
+.pline-k { font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; }
+.pline-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.pchip { display: grid; justify-items: center; gap: 4px; width: 76px; text-align: center; position: relative; }
+.pchip .p-ini { width: 48px; height: 48px; }
+.pchip .nm { font-size: 11.5px; font-weight: 700; line-height: 1.2; }
+.pchip .tm { font-size: 10.5px; font-weight: 500; color: var(--muted); }
+.pchip .cv-tag { position: absolute; top: -4px; right: 8px; min-width: 22px; height: 22px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 10.5px; font-weight: 800; display: grid; place-items: center; padding: 0 4px; }
+.field-pitch { background: var(--mint); border-radius: var(--r-lg); padding: 16px 8px 20px; border: 1.5px solid var(--ink); }
+.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cmp .col { background: var(--soft); border-radius: var(--r-md); padding: 10px 12px; min-width: 0; }
+.bat-table td, .bat-table th { white-space: nowrap; }
+body.plain-cards .card .tab, body.plain-cards .card .grip { display: none; }
+body.plain-cards .stack { padding-top: 0; }
+body.plain-cards .stack > .card { margin-top: 8px; border-radius: var(--r-lg); padding-bottom: 20px; }
+body.plain-cards .stack.grid { padding-top: 0; }

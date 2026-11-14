@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
         color: COLORS[Math.floor(Math.random() * COLORS.length)], last_seen_at: new Date().toISOString(),
       })
       if (insErr) throw insErr
+      await db.rpc('consume_invite', { p_user: userId, p_phone: phone })   // role and starting balance from Add member
     } else {
       await db.from('profiles').update({
         last_seen_at: new Date().toISOString(), ...(isAdminPhone && existing.role !== 'admin' ? { role: 'admin' } : {}),

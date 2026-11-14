@@ -65,13 +65,13 @@ export function AdminHome() {
 
       {needs.length > 0 && (
         <>
-          <div className="sec"><h2>Games needing you</h2></div>
+          <div className="sec"><h2>Games in progress</h2><span className="aside">all automatic</span></div>
           <div className="list" style={{ maxWidth: 560 }}>
             {needs.map((c) => (
               <Link key={c.id} to={`/admin/match/${c.match_id}`} className="row">
                 <span className="ic" style={{ ['--b' as string]: 'var(--warn-bg)' }}><Icon name={c.status === 'scored' ? 'trophy' : 'user'} /></span>
                 <span><span className="rt">{shortTeam(c.matches.team_a)} vs {shortTeam(c.matches.team_b)}</span>
-                  <span className="rs">{c.status === 'scored' ? 'Scored. Check and pay out.' : `Locked ${istDayName(c.lock_at).toLowerCase()} ${istTime(c.lock_at)}. Confirm the Playing XI.`}</span></span>
+                  <span className="rs">{c.status === 'scored' ? 'Scored. Pays out automatically.' : `Locked ${istDayName(c.lock_at).toLowerCase()} ${istTime(c.lock_at)}. Waiting for the Playing XI from CricketData.`}</span></span>
                 <Icon name="chev" />
               </Link>
             ))}
@@ -102,5 +102,12 @@ const MANAGE: { to: string; icon: IconName; label: string; sub: string }[] = [
   { to: '/admin/money', icon: 'sliders', label: 'Money settings', sub: 'UPI ID, limits, accepted apps' },
   { to: '/admin/rules', icon: 'trophy', label: 'Game rules', sub: 'Points, lock time, fees, ties' },
   { to: '/admin/matches', icon: 'stumps', label: 'Matches', sub: 'Show or hide matches' },
-  { to: '/admin/data', icon: 'gauge', label: 'Cricket data', sub: 'API credits and syncing' },
+  { to: '/admin/data', icon: 'gauge', label: 'Cricket data', sub: 'API credits, syncing, removed leagues' },
+  { to: '/admin/notifications', icon: 'bell', label: 'Notifications', sub: 'What members are told, message everyone' },
+  { to: '/admin/general', icon: 'sliders', label: 'General', sub: 'App name, admin name, days shown, home tab' },
+  { to: '/admin/badges', icon: 'image', label: 'Team badges', sub: 'Upload logos for clubs and leagues' },
+  { to: '/admin/appearance', icon: 'eye', label: 'Appearance', sub: 'Notched or plain match cards' },
+  { to: '/admin/signin', icon: 'key', label: 'Sign-in settings', sub: 'Code length, how long people stay signed in' },
+  { to: '/admin/activity', icon: 'log', label: 'Activity log', sub: 'Every money and game action' },
+  { to: '/admin/backup', icon: 'down', label: 'Backup', sub: 'Download everything as one file' },
 ]

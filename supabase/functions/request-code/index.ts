@@ -17,12 +17,13 @@ Deno.serve(async (req) => {
     const db = adminClient()
     const s = await loadSettings(db)
     const { data: member } = await db.from('profiles').select('id, blocked').eq('phone', phone).maybeSingle()
+    const { data: invite } = await db.from('invites').select('phone').eq('phone', phone).is('used_at', null).maybeSingle()
     if (member?.blocked) return json({ error: `This number can’t sign in. Ask ${s.admin_name}.` }, 403)
 
     const isAdminPhone = phone === s.admin_phone
     const now = Date.now()
 
-    if (s.members_only_codes && !member && !isAdminPhone) {
+    if (s.members_only_codes && !member && !invite && !isAdminPhone) {
       await db.from('otp_requests').insert({
         phone, name, code: '-', status: 'blocked', is_member: false, expires_at: new Date(now).toISOString(),
       })
@@ -41,7 +42,7 @@ Deno.serve(async (req) => {
     const code = randomCode(s.code_length)
     const expiresAt = new Date(now + s.code_ttl_minutes * 60 * 1000).toISOString()
     const { error } = await db.from('otp_requests').insert({
-      phone, name, code, is_member: Boolean(member) || isAdminPhone, expires_at: expiresAt,
+      phone, name, code, is_member: Boolean(member) || Boolean(invite) || isAdminPhone, expires_at: expiresAt,
     })
     if (error) throw error
 

@@ -7,7 +7,7 @@
 
 declare const process: { env: Record<string, string | undefined> }
 
-const ALLOWED = new Set(['currentMatches', 'matches', 'match_info', 'match_squad', 'match_scorecard', 'match_points', 'series_info'])
+const ALLOWED = new Set(['currentMatches', 'matches', 'match_info', 'match_squad', 'match_scorecard', 'match_points', 'series_info', 'series_squad'])
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 

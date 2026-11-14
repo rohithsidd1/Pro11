@@ -11,6 +11,7 @@ export interface Profile {
   blocked: boolean
   created_at: string
   last_seen_at: string | null
+  signout_at?: string | null
 }
 
 export interface AppSettings {
@@ -95,6 +96,10 @@ export interface Match {
   info_fetched_at: string | null
   last_synced_at: string
   xi_checked_at?: string | null
+  squad_attempted_at?: string | null
+  series_id?: string | null
+  live_points_at?: string | null
+  final_points_at?: string | null
   xi_source?: 'api' | 'admin' | null
 }
 
@@ -122,6 +127,8 @@ export interface DataSettings {
   sync_paused: boolean
   last_list_sync_at: string | null
   last_fixtures_sync_at: string | null
+  only_game_ready?: boolean
+  auto_xi_check?: boolean
 }
 
 export interface ApiUsage { day: string; credits: number; calls: number; hits_today: number | null; hits_limit: number | null }
@@ -154,7 +161,7 @@ export type GameKind = 'xi' | 'fantasy'
 export type ContestStatus = 'open' | 'locked' | 'scored' | 'paid' | 'cancelled'
 export interface Contest {
   id: string; match_id: string; game: GameKind; fee: number; enabled: boolean; status: ContestStatus
-  lock_at: string; cancel_reason: string | null; scored_at: string | null; settled_at: string | null
+  lock_at: string; cancel_reason: string | null; scored_at: string | null; settled_at: string | null; live_at?: string | null
 }
 export interface Entry {
   id: string; contest_id: string; user_id: string; points: number; correct: number; rank: number | null; payout: number
@@ -167,4 +174,12 @@ export interface GameSettings {
   xi_points_per_correct: number; xi_perfect_team_bonus: number; xi_both_perfect_bonus: number
   xi_lock_at: 'toss' | 'start'; toss_minutes_before: number; tie_rule: 'split' | 'earliest'
   default_fee_xi: number; default_fee_fantasy: number; min_players: number
+}
+
+export interface FantasyPick { entry_id: string; player_id: string; team: string; role: MatchPlayer['role']; captain: boolean; vice: boolean }
+export interface PlayerPoints { match_id: string; player_id: string; points: number; final: boolean; updated_at: string }
+export interface TeamRules {
+  fx_max_per_side: number; fx_wk_min: number; fx_wk_max: number; fx_bat_min: number; fx_bat_max: number
+  fx_ar_min: number; fx_ar_max: number; fx_bowl_min: number; fx_bowl_max: number
+  fx_captain_mult: number; fx_vice_mult: number; fx_live_update: boolean
 }

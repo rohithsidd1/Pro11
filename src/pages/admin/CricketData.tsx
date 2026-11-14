@@ -9,7 +9,7 @@ import type { DataSettings } from '../../lib/types'
 import { useDataStatus } from '../../lib/useDataSettings'
 
 const ENDPOINT: Record<string, string> = {
-  currentMatches: 'Match list', matches: 'Upcoming fixtures', match_info: 'Match details', match_squad: 'Squads',
+  currentMatches: 'Match list', matches: 'Upcoming fixtures', match_info: 'Match details', match_squad: 'Match squad', series_squad: 'Series squad', match_points: 'Fantasy points',
 }
 
 export function CricketData() {
@@ -33,6 +33,27 @@ export function CricketData() {
       p_show_domestic: form.show_domestic, p_sync_paused: form.sync_paused,
     })
     setBusy(null)
+    if (error) return toast(errorText(error))
+    toast('Saved'); void reload()
+  }
+
+  const [blocked, setBlocked] = useState<{ series_id: string; reason: string; blocked_at: string; name?: string }[]>([])
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase.from('blocked_series').select('*').order('blocked_at', { ascending: false })
+      const rows = (data ?? []) as { series_id: string; reason: string; blocked_at: string }[]
+      const { data: ms } = rows.length ? await supabase.from('matches').select('series_id, series_name').in('series_id', rows.map((r) => r.series_id)) : { data: [] }
+      setBlocked(rows.map((r) => ({ ...r, name: (ms ?? []).find((m: { series_id: string }) => m.series_id === r.series_id)?.series_name ?? undefined })))
+    })()
+  }, [calls.length])
+  const unblock = async (sid: string) => {
+    const { error } = await supabase.rpc('admin_unblock_series', { p_series: sid })
+    if (error) return toast(errorText(error))
+    setBlocked((b) => b.filter((x) => x.series_id !== sid)); toast('Brought back. Squads load again when someone joins.')
+  }
+
+  const setOption = async (only: boolean, autoXi: boolean) => {
+    const { error } = await supabase.rpc('admin_set_data_options', { p_only_game_ready: only, p_auto_xi_check: autoXi })
     if (error) return toast(errorText(error))
     toast('Saved'); void reload()
   }
@@ -91,6 +112,15 @@ export function CricketData() {
               <NumberRule k="fixtures_refresh_hours" label="Load upcoming fixtures every" sub="1 credit per page" min={1} max={48} unit="hrs" />
               <NumberRule k="fixtures_pages" label="Fixture pages each time" sub="0 turns fixtures off" min={0} max={5} />
               <Toggle k="sync_paused" label="Pause all syncing" sub="Nothing is fetched until you turn this off" />
+              <div className="ch" style={{ marginTop: 18 }}><h3>Save credits</h3></div>
+              <label className="rule" style={{ cursor: 'pointer' }}>
+                <div><p className="k">Only matches with game data</p><p className="s">Hide matches CricketData has no squad or fantasy data for. They appear once it does.</p></div>
+                <input type="checkbox" role="switch" className="switch" checked={settings?.only_game_ready ?? true} onChange={(e) => setOption(e.target.checked, settings?.auto_xi_check ?? false)} />
+              </label>
+              <label className="rule" style={{ cursor: 'pointer' }}>
+                <div><p className="k">Get the Playing XI automatically</p><p className="s">About 10 credits per game after the toss, and 10 more after the match if needed. Off: Predict the XI games refund themselves.</p></div>
+                <input type="checkbox" role="switch" className="switch" checked={settings?.auto_xi_check ?? false} onChange={(e) => setOption(settings?.only_game_ready ?? true, e.target.checked)} />
+              </label>
               <div className="ch" style={{ marginTop: 18 }}><h3>Which matches to show</h3></div>
               <Toggle k="show_men_intl" label="Men’s internationals" />
               <Toggle k="show_women_intl" label="Women’s internationals" />
@@ -103,6 +133,20 @@ export function CricketData() {
           )}
         </div>
 
+        <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+        {blocked.length > 0 && (
+          <section className="panel">
+            <div className="ch"><h3>Leagues removed</h3><span className="help">no data from CricketData</span></div>
+            <div className="list">
+              {blocked.map((b) => (
+                <div key={b.series_id} className="row nolead" style={{ background: 'var(--sand)', gridTemplateColumns: '1fr auto' }}>
+                  <span><span className="rt">{b.name ?? 'A league'}</span><span className="rs">Removed {istDayName(b.blocked_at).toLowerCase()} {istTime(b.blocked_at)}</span></span>
+                  <button className="btn sm" onClick={() => unblock(b.series_id)}><span>Bring back</span></button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <section className="panel">
           <div className="ch"><h3>Recent API calls</h3><span className="help">newest first</span></div>
           {calls.length === 0 ? <p className="help">No calls yet. Tap Refresh match list to make the first one.</p> : (
@@ -126,6 +170,7 @@ export function CricketData() {
             </div>
           )}
         </section>
+        </div>
       </div>
     </Shell>
   )

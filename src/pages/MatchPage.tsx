@@ -4,7 +4,7 @@ import { Empty } from '../components/Empty'
 import { Icon } from '../components/Icon'
 import { Shell } from '../components/Shell'
 import { TeamBadge } from '../components/TeamBadge'
-import { XiGameCard } from '../components/XiGameCard'
+import { GameCard } from '../components/GameCard'
 import { callFunction } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { isLive, scoreFor, scoreText, shortTeam } from '../lib/cricket'
@@ -37,11 +37,12 @@ export function MatchPage() {
   useEffect(() => { void load() }, [load])
 
   const run = async (mode: 'info' | 'squad') => {
+    if (!m) return
     setBusy(mode)
     try {
       await callFunction('sync-cricket', { mode, matchId: id })
+      toast('Match updated')
       await load()
-      toast(mode === 'squad' ? 'Squads updated' : 'Match updated')
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Couldn’t update')
     } finally { setBusy(null) }
@@ -69,6 +70,7 @@ export function MatchPage() {
               <div className="team"><TeamBadge team={m.team_b} short={m.team_b_short} img={m.team_b_img} size={84} /><span className="tn">{m.team_b}</span></div>
             </div>
             {m.venue && <p className="ground-line">{m.venue}</p>}
+            {(m.started || m.ended) && <p style={{ textAlign: 'center', marginTop: 8 }}><a className="textlink" href={`/match/${m.id}/scorecard`} style={{ minHeight: 0 }}>Scorecard</a></p>}
 
             {(m.started || m.ended) && m.score.length > 0 && (
               <div style={{ marginTop: 16 }}>
@@ -98,28 +100,18 @@ export function MatchPage() {
           </section>
 
           <ol className="stack games" aria-label="Games for this match">
-            <XiGameCard match={m} />
-            <li className="card game" style={{ ['--c' as string]: 'var(--coral)' }}>
-              <span className="tab l">Game <span className="num">2</span></span>
-              <span className="grip" aria-hidden="true" />
-              <h3>Fantasy XI</h3>
-              <p className="desc">Pick 11 players, a captain (2×) and a vice-captain (1.5×). Arrives in the next update.</p>
-            </li>
+            <GameCard match={m} game="xi" />
+            <GameCard match={m} game="fantasy" />
           </ol>
-          <p className="fine">A game needs at least 2 players by the lock. If it doesn’t fill, it’s cancelled and your entry goes back to your wallet.</p>
+          <p className="fine">Each game needs at least 2 players by its lock. If it doesn’t fill, or CricketData doesn’t have the data, it’s cancelled and your entry goes back to your wallet.</p>
 
           {isAdmin && (
             <>
-              <div className="sec"><h2>Admin</h2><span className="aside">Uses API credits</span></div>
-              <div className="btn-stack">
-                <button className="btn sm" disabled={!!busy} onClick={() => run('info')}>
-                  {busy === 'info' ? <span className="spinner" /> : <Icon name="refresh" small />}<span>Refresh match, 1 credit</span>
-                </button>
-                <button className="btn sm" disabled={!!busy || !m.fantasy_ok} onClick={() => run('squad')}>
-                  {busy === 'squad' ? <span className="spinner" /> : <Icon name="user" small />}<span>Fetch squads, ~10 credits</span>
-                </button>
-              </div>
-              {!m.fantasy_ok && <p className="fine">The cricket data service has no squad data for this match.</p>}
+              <div className="sec"><h2>Admin</h2><span className="aside">1 credit</span></div>
+              <button className="btn sm" disabled={!!busy} onClick={() => run('info')}>
+                {busy === 'info' ? <span className="spinner" /> : <Icon name="refresh" small />}<span>Refresh match</span>
+              </button>
+              <a className="btn sm" style={{ marginLeft: 8 }} href={`/admin/match/${m.id}`}><Icon name="trophy" small /><span>Game status</span></a>
             </>
           )}
         </div>
@@ -132,7 +124,7 @@ export function MatchPage() {
           {players.length === 0 ? (
             <div className="panel" style={{ background: 'var(--soft)' }}>
               <p className="rt">Squads aren’t loaded yet</p>
-              <p className="rs">They load when a game opens for this match.</p>
+              <p className="rs">They load from CricketData automatically when the first person joins a game.</p>
             </div>
           ) : (
             teams.map((t) => {

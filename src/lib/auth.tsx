@@ -65,6 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!localStorage.getItem(EPOCH)) localStorage.setItem(EPOCH, String(set.session_epoch))
     const tooOld = at > 0 && now - at > set.session_days * 864e5
     if (tooOld || storedEpoch !== set.session_epoch) return signOut('expired')
+    // the admin signed this member out on all devices
+    if (prof.signout_at && at > 0 && new Date(prof.signout_at).getTime() > at) return signOut('expired')
+    document.body.classList.toggle('plain-cards', (set as unknown as { card_style?: string }).card_style === 'plain')
 
     setProfile(prof)
     setSettings(set)

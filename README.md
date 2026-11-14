@@ -2,7 +2,7 @@
 
 Cricket games for the family. React + Vite + TypeScript PWA, Supabase backend, hosted on Netlify. Everything runs on free tiers.
 
-**Build progress:** Step 4 of 7, Game 1: Predict the Playing XI ✅
+**Build progress:** all 7 steps built ✅ · to deploy this version, follow `DEPLOY.md`
 
 | Step | What | Status |
 |---|---|---|
@@ -10,7 +10,7 @@ Cricket games for the family. React + Vite + TypeScript PWA, Supabase backend, h
 | 2 | Cricket data sync (90-credit cap), match list, match screen | ✅ |
 | 3 | Wallet: UPI pay link + QR, screenshot reading, approvals, withdrawals | ✅ |
 | 4 | Game 1: Predict the XI, end to end | |
-| 5 | Game 2: Fantasy XI, end to end | Next |
+| 5 | Game 2: Fantasy XI, end to end | ✅ |
 | 6 | Admin rules and settings, notifications, ranks, history, backups | |
 | 7 | Tablet/desktop polish, final checks | |
 
@@ -122,6 +122,43 @@ CricketData blocks requests from Supabase's servers, so the calls go through a s
 
 ---
 
+## Step 7: everything else from the approved screens
+
+- **Phone alerts (Web Push, free):** "Stay in the loop" after sign-in, a switch on Me, `send-push` function, delivered for
+  every notification. iPhone needs Pro11 on the Home Screen (iOS 16.4+): see **Install**.
+- **Install** screen (iPhone / Android, with Android's install prompt), **offline** banner.
+- **Fantasy XI:** team preview on a pitch, **Compare teams** on results. **Scorecard** screen (totals and top performers free;
+  full batting/bowling card optional in Game rules, 10 credits a match).
+- **Ranks:** month / year / all time, by money or by **bonus points** (leaderboard only, never money).
+- **Admin:** Add member (with WhatsApp invite and starting balance), member details (wallet, in games, net, recent, sign out on all
+  devices), per-match game settings (open, fee, most players), Game rules (per-format defaults, most players, payout: winner takes
+  all or top 2 split 70/30, bonus points, CricketData points ruleset, full scorecard), Notifications (what members are told, reminder
+  time, Message everyone), General (app name, admin name, days shown, home tab), Team badges (upload logos), Appearance.
+- Manual squads, manual Playing XI, manual points and manual "finish a match" are intentionally gone: everything is automatic.
+
+---
+
+## Steps 5 and 6 setup: Fantasy XI, notifications, ranks
+
+1. **Database:** SQL Editor → `supabase/migrations/20261114000008_fantasy.sql`, then `20261114000009_ranks.sql` → Run.
+2. **App:** push to GitHub (Netlify deploys by itself).
+3. **Sync function changed:** redeploy `sync-cricket` (fresh access token, delete it afterwards).
+
+### Fantasy XI (all automatic)
+- Pick 11 (most 7 from one team; 1–4 WK, 3–6 BAT, 1–4 AR, 3–6 BOWL), a captain (2×) and vice-captain (1.5×). Editable until the start.
+- Points are CricketData's fantasy points: one live update around the innings break (optional, Game rules) and the final points
+  when the match ends. The final call also gives Predict the XI its Playing XI if it's still missing.
+- After the expected end, a 1-credit "has it finished?" check every 30 minutes. Abandoned or no result → both games refunded.
+- Pays out 30 minutes after the final points. Credits per match with both games: about 31.
+
+### Also new
+- **Notifications** (bell with unread count), **Ranks** (this month / all time, per game: won, money won, net),
+  **My games** and **How Pro11 works** on the Me screen.
+- Admin: **Game status** per match for both games, **Fantasy XI team rules** in Game rules, **Sign-in settings**,
+  **Activity log**, **Backup** (everything as one JSON file).
+
+---
+
 ## Step 4 setup: Game 1, Predict the Playing XI
 
 1. **Database:** SQL Editor → paste `supabase/migrations/20261114000004_game1.sql` → Run (choose Run if it warns).
@@ -149,6 +186,21 @@ CricketData blocks requests from Supabase's servers, so the calls go through a s
   entry) or earliest entry wins, per Game rules. Cancel and refund works any time before payout.
 - The first squad call logs CricketData's player fields in Cricket data → Recent API calls ("Player fields: …").
   Send me that line: if it shows a playing flag, the XI will fill itself in.
+
+### Fully automatic (no manual squads, no manual Playing XI)
+Run `pro11-automation-database.sql` (migrations 5, 6 and 7), push the app, redeploy `sync-cricket`.
+
+- **Only matches with game data** are listed (CricketData's free match-list flags: fantasyEnabled + hasSquad).
+- **Squads** load by themselves when the first person joins: the series squad first (1 credit, reused for the whole
+  series), the match squad (10 credits, a Fantasy API) only when needed. Each match is requested once.
+- **No squad from CricketData → the whole league is removed** from Pro11 and its open games are refunded.
+  (Admin → Cricket data → Leagues removed → Bring back, if CricketData adds data later.)
+- **Playing XI** comes from CricketData after the toss (10 credits) or, failing that, from the fantasy points after the
+  match (10 credits). If neither names exactly 11 a side, the game refunds itself.
+- **Payout** happens by itself 30 minutes after scoring. The admin's only button is an emergency Cancel and refund.
+- Calls that never reached CricketData (outage, daily limit) are retried later; they never remove a league.
+- Tested end to end: the real sync function against a real Postgres + PostgREST with a fake CricketData that
+  charges like the free plan. 5 matches, every outcome, 0 credits on repeat runs, money balanced to the rupee.
 
 ### What to test in step 4
 - Two people join a match's Predict the XI with enough balance; a third without enough sees "Add ₹X to join".

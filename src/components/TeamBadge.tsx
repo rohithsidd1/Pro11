@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { flagFor, initials, teamColor } from '../lib/cricket'
+import { useCustomBadges } from '../lib/teams'
 
 /** National flag when we have one, else the API's team logo, else initials on a team colour. */
-export function TeamBadge({ team, short, img, size = 46 }: { team: string; short?: string | null; img?: string | null; size?: number }) {
+export function TeamBadge({ team, short, img: imgIn, size = 46 }: { team: string; short?: string | null; img?: string | null; size?: number }) {
   const [broken, setBroken] = useState(false)
-  const flag = flagFor(team)
+  let img = imgIn
+  const custom = useCustomBadges().get(team.toLowerCase())
+  const flag = custom ? null : flagFor(team)
+  if (custom) img = custom
   const style = { width: size, height: size }
   if (flag) {
     return (

@@ -4,6 +4,7 @@ import { Empty } from '../../components/Empty'
 import { Icon } from '../../components/Icon'
 import { Shell } from '../../components/Shell'
 import { callFunction, errorText } from '../../lib/api'
+import { canAutoLoadSquad } from '../../lib/squads'
 import { initials, shortTeam, teamColor } from '../../lib/cricket'
 import { istTime, untilText } from '../../lib/ist'
 import { supabase } from '../../lib/supabase'
@@ -19,10 +20,18 @@ export function PickXi() {
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [dirty, setDirty] = useState(false)
   const [team, setTeam] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'save' | 'squad' | null>(null)
+  const [busy, setBusy] = useState<'save' | null>(null)
 
   useEffect(() => { if (!dirty) setPicked(new Set(myPicks.map((p) => p.player_id))) }, [myPicks, dirty])
   useEffect(() => { if (match && !team) setTeam(match.team_a) }, [match, team])
+  // Squads load by themselves: ask once if allowed, then keep checking until they arrive.
+  useEffect(() => {
+    if (!match || players.length) return
+    if (canAutoLoadSquad(match)) void callFunction('sync-cricket', { mode: 'squad-for-entry', matchId: id }).then(() => reloadSquad()).catch(() => undefined)
+    const t = window.setInterval(() => void reloadSquad(), 20000)
+    return () => window.clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.id, players.length])
 
   const byTeam = useMemo(() => {
     const m = new Map<string, MatchPlayer[]>()
@@ -60,21 +69,14 @@ export function PickXi() {
     setDirty(false); await reload()
     toast(total === 22 ? 'All 22 saved. Good luck!' : `Saved ${total} of 22. You can change them until ${istTime(contest.lock_at)}.`)
   }
-  const loadSquads = async () => {
-    setBusy('squad')
-    try { await callFunction('sync-cricket', { mode: 'squad-for-entry', matchId: id }); await reloadSquad() }
-    catch (e) { toast(e instanceof Error ? e.message : 'Couldn’t load squads') }
-    finally { setBusy(null) }
-  }
 
   return (
     <Shell title="Predict the XI" kicker={open ? `Locks at ${istTime(contest.lock_at)}, in ${untilText(contest.lock_at)}` : 'Locked'} back={`/match/${id}`}
       actions={!open ? <Link className="btn sm" to={`/match/${id}/xi/results`}><Icon name="trophy" small /><span>Results</span></Link> : undefined}>
       <div className="pick-wrap">
       {players.length === 0 ? (
-        <Empty icon="user" title="Squads aren’t loaded yet"
-          action={<button className="btn primary" disabled={busy === 'squad'} onClick={loadSquads}>{busy === 'squad' ? <span className="spinner" /> : <><Icon name="refresh" /><span>Load squads</span></>}</button>}>
-          They load once for this match. If the data service has none, the admin can add them.
+        <Empty icon="user" title="Loading squads from CricketData…">
+          This happens automatically and usually takes under a minute. If CricketData has no squad for this league, the game is cancelled and your entry comes back.
         </Empty>
       ) : (
         <>

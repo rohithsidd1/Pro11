@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { Icon } from '../components/Icon'
+import { MyGames } from '../components/MyGames'
+import { AlertsToggle } from '../components/AlertsToggle'
 import { Shell } from '../components/Shell'
 import { errorText } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -76,11 +78,30 @@ export function Profile() {
         </form>
       </div>
 
-      <div className="list" style={{ marginTop: 8 }}>
+      <div className="sec"><h2>My games</h2></div>
+      <MyGames />
+
+      <div className="list" style={{ marginTop: 16 }}>
+        <AlertsToggle />
+        <Link to="/install" className="row">
+          <span className="ic" style={{ ['--b' as string]: 'var(--soft)' }}><Icon name="phone" /></span>
+          <span><span className="rt">Install on your phone</span><span className="rs">Opens like an app; needed for alerts on iPhone</span></span>
+          <Icon name="chev" />
+        </Link>
+        <Link to="/notifications" className="row">
+          <span className="ic" style={{ ['--b' as string]: 'var(--soft)' }}><Icon name="bell" /></span>
+          <span><span className="rt">Notifications</span><span className="rs">Payments, withdrawals and results</span></span>
+          <Icon name="chev" />
+        </Link>
+        <Link to="/help" className="row">
+          <span className="ic" style={{ ['--b' as string]: 'var(--soft)' }}><Icon name="info" /></span>
+          <span><span className="rt">How Pro11 works</span><span className="rs">Games, points, money</span></span>
+          <Icon name="chev" />
+        </Link>
         {isAdmin && (
           <Link to="/admin" className="row">
             <span className="ic" style={{ ['--b' as string]: 'var(--lemon)' }}><Icon name="shield" /></span>
-            <span><span className="rt">Admin</span><span className="rs">Sign-in codes and members</span></span>
+            <span><span className="rt">Admin</span><span className="rs">Money, games, members and settings</span></span>
             <Icon name="chev" />
           </Link>
         )}
