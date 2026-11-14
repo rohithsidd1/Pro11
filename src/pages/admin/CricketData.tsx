@@ -8,6 +8,8 @@ import { useToast } from '../../lib/toast'
 import type { DataSettings } from '../../lib/types'
 import { useDataStatus } from '../../lib/useDataSettings'
 import { useSettingsForm } from '../../lib/useSettingsForm'
+import { reportSummary, useMatchReport } from '../../components/MatchReport'
+import { Link } from 'react-router-dom'
 
 const ENDPOINT: Record<string, string> = {
   currentMatches: 'Match list', matches: 'Fixtures (old)', series_info: 'Series schedule', match_info: 'Match details', match_squad: 'Match squad', series_squad: 'Series squad', match_points: 'Fantasy points',
@@ -57,6 +59,7 @@ export function CricketData() {
     setBlocked((b) => b.filter((x) => x.series_id !== sid)); toast('Brought back. Squads load again when someone joins.')
   }
 
+  const report = useMatchReport()
   const setOption = async (only: boolean, autoXi: boolean) => {
     const { error } = await supabase.rpc('admin_set_data_options', { p_only_game_ready: only, p_auto_xi_check: autoXi })
     if (error) return toast(errorText(error))
@@ -67,7 +70,8 @@ export function CricketData() {
     setBusy(mode)
     try {
       const r = await callFunction<{ result: { saved: number; pages?: number; series?: number } }>('sync-cricket', { mode })
-      toast(mode === 'list' ? `${r.result.saved} matches from ${r.result.pages ?? 0} pages` : `${r.result.saved} upcoming matches from ${r.result.series ?? 0} series`)
+      await report.reload()
+      toast(mode === 'list' ? `${r.result.saved} matches from ${r.result.pages ?? 0} pages. See “What members see” for each one.` : `${r.result.saved} upcoming matches from ${r.result.series ?? 0} series`)
     } catch (e) { toast(e instanceof Error ? e.message : 'Couldn’t sync') } finally { setBusy(null); void reload() }
   }
 
@@ -153,6 +157,16 @@ export function CricketData() {
             </div>
           </section>
         )}
+        <section className="panel">
+          <div className="ch"><h3>What members see</h3><Link className="textlink" style={{ minHeight: 0 }} to="/admin/matches">Every match and why</Link></div>
+          {!report.rows ? <p className="help">Loading…</p> : report.rows.length === 0 ? <p className="help">No matches yet. Tap Refresh match list.</p> : (
+            <div className="list">
+              {reportSummary(report.rows).map((x) => (
+                <div key={x.reason} className="read"><span className="k">{x.reason === 'Shown' ? <b>Members see them</b> : x.reason}</span><span className="v">{x.n}</span></div>
+              ))}
+            </div>
+          )}
+        </section>
         <section className="panel">
           <div className="ch"><h3>How early squads appear</h3><span className="help">last 30 days</span></div>
           {leads.length === 0

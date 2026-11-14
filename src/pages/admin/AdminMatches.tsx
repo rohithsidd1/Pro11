@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Empty } from '../../components/Empty'
 import { Icon } from '../../components/Icon'
 import { Shell } from '../../components/Shell'
+import { MatchReport } from '../../components/MatchReport'
 import { TeamBadge } from '../../components/TeamBadge'
 import { callFunction, errorText } from '../../lib/api'
 import { shortTeam } from '../../lib/cricket'
@@ -23,6 +24,7 @@ function autoShown(m: Match, s: DataSettings | null): boolean {
 }
 
 export function AdminMatches() {
+  const [reportKey, setReportKey] = useState(0)
   const toast = useToast()
   const { matches, reload } = useMatchFeed('matches')
   const { settings, used, reload: reloadStatus } = useDataStatus()
@@ -43,16 +45,17 @@ export function AdminMatches() {
     setBusy(true)
     try {
       const res = await callFunction<{ result: { saved: number } }>('sync-cricket', { mode: 'list' })
-      toast(`${res.result.saved} matches updated`)
-      void reload(); void reloadStatus()
+      toast(`${res.result.saved} matches updated. The list above shows what members see and why.`)
+      void reload(); void reloadStatus(); setReportKey((k) => k + 1)
     } catch (e) { toast(e instanceof Error ? e.message : 'Couldn’t refresh') } finally { setBusy(false) }
   }
 
   return (
-    <Shell title="Matches" kicker="Show or hide matches"
+    <Shell title="Matches" kicker="What members see, and why"
       actions={<button className="btn sm primary" onClick={refresh} disabled={busy}>{busy ? <span className="spinner" /> : <Icon name="refresh" small />}<span>Refresh now</span></button>}>
+      <MatchReport key={reportKey} />
       <p className="help" style={{ marginBottom: 14 }}>
-        Credits used today: <b className="num">{used}</b> of <span className="num">{settings?.daily_credit_cap ?? 90}</span>. A refresh costs about <span className="num">1–2</span>.
+        Credits used today: <b className="num">{used}</b> of <span className="num">{settings?.daily_credit_cap ?? 90}</span>. A refresh costs 1 credit per 25 matches.
         {' '}<Link to="/admin/data" className="textlink" style={{ minHeight: 0, fontSize: 12.5 }}>Cricket data settings</Link>
       </p>
       <div className="seg" style={{ maxWidth: 520 }}>

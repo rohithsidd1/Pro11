@@ -5,7 +5,7 @@ Everything here is safe to run again if you're unsure whether you already did it
 1. **Database** · Supabase → SQL Editor → paste `pro11-database-update.sql` → Run (choose Run if it warns).
    Safe whether or not you ran any earlier database file. It also turns syncing back on.
 
-2. **Functions** · two changed: `sync-cricket` and `verify-code`. Make a brand-new token at
+2. **Functions** · `sync-cricket` changed (and `verify-code`, if you haven't deployed it since the audit fixes). Make a brand-new token at
    supabase.com/dashboard/account/tokens (delete every old one), never paste it in a chat, then from this folder:
    ```bash
    export SUPABASE_ACCESS_TOKEN=your_new_token

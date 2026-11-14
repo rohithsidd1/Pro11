@@ -44,6 +44,20 @@ async function authorize(req: Request, db: SupabaseClient): Promise<Caller | nul
   return { trigger: p.role === 'admin' ? 'admin' : 'auto', userId: u.user.id, isAdmin: p.role === 'admin' }
 }
 
+/** What a list call contained, for the admin's API log: "25 rows of 59 · 20 finished, 3 live, 2 to start". */
+// deno-lint-ignore no-explicit-any
+function describe(data: any, rows: number | null, info: Record<string, unknown>): string | null {
+  // deno-lint-ignore no-explicit-any
+  const list: any[] | null = Array.isArray(data) ? data : Array.isArray(data?.matchList) ? data.matchList : null
+  const head = rows !== null ? `${rows} rows${info.totalRows ? ` of ${info.totalRows}` : ''}` : list ? `${list.length} matches in the series` : null
+  if (!list?.length || !list.some((m) => m && ('matchStarted' in m || 'matchEnded' in m || 'dateTimeGMT' in m))) return head
+  const ended = list.filter((m) => m?.matchEnded).length
+  const live = list.filter((m) => m?.matchStarted && !m?.matchEnded).length
+  const toStart = list.length - ended - live
+  const fantasy = list.filter((m) => !m?.matchEnded && m?.fantasyEnabled).length
+  return `${head} · ${ended} finished, ${live} live, ${toStart} to start · ${fantasy} not finished with fantasy data`.slice(0, 200)
+}
+
 async function log(ctx: Ctx, endpoint: string, matchId: string | null, credits: number, ok: boolean, note: string | null) {
   await ctx.db.from('api_calls').insert({ endpoint, match_id: matchId, credits, ok, trigger: ctx.trigger, note })
 }
@@ -131,7 +145,7 @@ async function api(ctx: Ctx, endpoint: string, params: Record<string, string>, m
   }
   ctx.last = 'ok'
   const rows = Array.isArray(body.data) ? body.data.length : null
-  await log(ctx, endpoint, matchId, spent, true, rows === null ? null : `${rows} rows${info.totalRows ? ` of ${info.totalRows}` : ''}`)
+  await log(ctx, endpoint, matchId, spent, true, describe(body.data, rows, info))
   return body.data
 }
 

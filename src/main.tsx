@@ -6,6 +6,20 @@ import { AuthProvider } from './lib/auth'
 import { configError } from './lib/supabase'
 import { ToastProvider } from './lib/toast'
 import './styles/app.css'
+import { registerSW } from 'virtual:pwa-register'
+
+// The app is installed like a phone app, so a tab left open could keep an old version.
+// Check for a new version every 30 minutes and whenever the app comes back to the front; update straight away.
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() { void updateSW(true) },
+  onRegisteredSW(_url, reg) {
+    if (!reg) return
+    const check = () => { if (navigator.onLine) void reg.update() }
+    window.setInterval(check, 30 * 60 * 1000)
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check() })
+  },
+})
 
 const root = createRoot(document.getElementById('root')!)
 

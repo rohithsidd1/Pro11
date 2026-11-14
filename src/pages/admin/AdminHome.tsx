@@ -92,6 +92,7 @@ export function AdminHome() {
 
       <div className="sec"><h2>Safety</h2></div>
       <button className="btn danger" onClick={signEveryoneOut}><Icon name="logout" /><span>Sign everyone out</span></button>
+          <p className="fine" style={{ paddingLeft: 0, marginTop: 16 }}>App version: {new Date(__BUILD_TIME__).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })} IST. If this looks old, reload the page.</p>
     </Shell>
   )
 }
