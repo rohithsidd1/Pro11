@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { rupees } from '../lib/money'
+import { useWallet } from '../lib/useWallet'
 import { Empty } from '../components/Empty'
 import { Icon } from '../components/Icon'
 import { MatchCard } from '../components/MatchCard'
@@ -13,6 +16,7 @@ const CHIPS: FormatChip[] = ['All', 'T20', 'ODI', 'Test', 'Women']
 export function Home() {
   const { profile } = useAuth()
   const { matches, loading, error, reload } = useMatchFeed()
+  const { balance, loading: walletLoading } = useWallet()
   const [tab, setTab] = useState<DayTab>('Today')
   const [chip, setChip] = useState<FormatChip>('All')
   const shown = filterMatches(matches, tab, chip)
@@ -21,7 +25,10 @@ export function Home() {
 
   return (
     <Shell title="Matches" kicker={profile ? `Hi ${profile.name.split(' ')[0]}` : undefined}
-      actions={<button className="icon-btn" aria-label="Notifications"><Icon name="bell" /></button>}>
+      actions={<>
+        <Link to="/wallet" className="wallet-chip" aria-label={`Wallet, ${rupees(balance)}`}><Icon name="wallet" small /><span>{walletLoading ? '…' : rupees(balance)}</span></Link>
+        <button className="icon-btn" aria-label="Notifications"><Icon name="bell" /></button>
+      </>}>
       <div className="hero-card">
         <div>
           <p className="kicker">Cricket</p>

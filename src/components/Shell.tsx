@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { usePendingCodeCount } from '../lib/usePendingCodes'
+import { useMoneyQueue } from '../lib/useWallet'
 import { Avatar } from './Avatar'
 import { Icon, type IconName } from './Icon'
 
@@ -20,14 +21,18 @@ export function Shell({ title, kicker, actions, back, children }: {
   const { profile, isAdmin } = useAuth()
   const pending = usePendingCodeCount(isAdmin)
   const navigate = useNavigate()
+  const money = useMoneyQueue(isAdmin)
   const adminNav: NavItem[] = [
     { to: '/admin', icon: 'shield', label: 'Dashboard', end: true },
     { to: '/admin/codes', icon: 'key', label: 'Sign-in codes', count: pending },
+    { to: '/admin/payments', icon: 'receipt', label: 'Payments', count: money.payments },
+    { to: '/admin/withdrawals', icon: 'up', label: 'Withdrawals', count: money.withdrawals },
     { to: '/admin/members', icon: 'user', label: 'Members' },
+    { to: '/admin/balances', icon: 'wallet', label: 'Balances' },
     { to: '/admin/matches', icon: 'stumps', label: 'Matches' },
     { to: '/admin/data', icon: 'gauge', label: 'Cricket data' },
   ]
-  const mobileNav: NavItem[] = isAdmin ? [...USER_NAV, { to: '/admin', icon: 'shield', label: 'Admin', count: pending }] : USER_NAV
+  const mobileNav: NavItem[] = isAdmin ? [...USER_NAV, { to: '/admin', icon: 'shield', label: 'Admin', count: pending + money.payments + money.withdrawals }] : USER_NAV
 
   return (
     <div className="shell">

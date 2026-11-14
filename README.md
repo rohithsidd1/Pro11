@@ -2,13 +2,13 @@
 
 Cricket games for the family. React + Vite + TypeScript PWA, Supabase backend, hosted on Netlify. Everything runs on free tiers.
 
-**Build progress:** Step 2 of 7, Cricket data ✅
+**Build progress:** Step 3 of 7, Wallet ✅
 
 | Step | What | Status |
 |---|---|---|
 | 1 | Design system, app shell, database, admin-relayed sign-in, members | ✅ |
-| 2 | Cricket data sync (90-credit cap), match list, match screen | ✅ This drop |
-| 3 | Wallet: UPI pay link + QR, screenshot reading, approvals, withdrawals | Next |
+| 2 | Cricket data sync (90-credit cap), match list, match screen | ✅ |
+| 3 | Wallet: UPI pay link + QR, screenshot reading, approvals, withdrawals | ✅ This drop |
 | 4 | Game 1: Predict the XI, end to end | |
 | 5 | Game 2: Fantasy XI, end to end | |
 | 6 | Admin rules and settings, notifications, ranks, history, backups | |
@@ -119,6 +119,37 @@ CricketData blocks requests from Supabase's servers, so the calls go through a s
 - Admin → Cricket data: change the filters (for example turn on Domestic), the limit, pause syncing
 - Set the daily limit to a number you've already reached and tap Refresh: the call is skipped and logged, not made
 - Supabase → **Integrations → Cron** (or Database → Cron): the `pro11-cricket-tick` job runs every hour
+
+---
+
+## Step 3 setup: wallet
+
+1. **Database:** Supabase → SQL Editor → paste `supabase/migrations/20261114000003_wallet.sql` → Run.
+   If Supabase warns about "destructive operations", choose **Run** (it only replaces its own policies).
+2. **App:** `git add . && git commit -m "Step 3: wallet" && git push`. Netlify deploys by itself.
+   No new functions or secrets this step.
+
+### How the money works
+- A balance is never stored. It's always the sum of the ledger (`wallet_txns`), so it can't drift.
+- Top-up: the member pays your UPI ID, uploads the screenshot, the app reads it in the browser (Tesseract.js, free),
+  and you approve or reject with a reason. Only an approval adds money.
+- A UTR can be used once. A rejected one can be reused for a corrected upload.
+- Withdrawal: the amount leaves the member's balance at once (so it can't be spent twice). You pay on UPI,
+  add the UTR or a screenshot, and mark it paid. Reject or cancel returns it immediately.
+- You can add or take money from **Members → (member) → Wallet**. No wallet can go below ₹0.
+- Screenshots are private (bucket `payment-proofs`): each member sees only their own; you see all.
+- Every movement writes a ledger row, a notification for the person, and an audit-log entry.
+
+### What to test in step 3
+- **Member:** Wallet → Add money → pick ₹10 (smallest) → pay your own UPI ID from another phone/app → upload the screenshot.
+  The amount, UTR, date and "paid to" should fill in and show green. Send it.
+- **Admin:** Payments → check the screenshot and the checks → Approve. The member's balance updates (it refreshes every 30 s).
+- Try the same UTR again: it's refused. Reject one with a reason: the member sees the reason and "Upload again".
+- **Withdraw** ₹50+: the balance drops at once. As admin: Withdrawals → open UPI app / QR → add the UTR → Mark as paid.
+  Also try Cancel (as member) and Reject (as admin): the money comes back.
+- Members → open someone → Wallet → add or take money with a reason. Taking more than they have is refused.
+- Balances: totals and the per-member table; Export downloads the full ledger as CSV.
+- Money settings: change limits or turn off an app, then try a top-up outside the limits.
 
 ## What to test in step 1
 - Welcome → Sign in → Enter code on a phone and on a computer

@@ -7,3 +7,6 @@ dev-dist
 supabase/.temp
 supabase/.branches
 *.log
+
+# OCR language data cached by local tests
+*.traineddata

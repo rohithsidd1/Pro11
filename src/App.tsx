@@ -12,6 +12,15 @@ import { Welcome } from './pages/auth/Welcome'
 import { ComingSoon } from './pages/ComingSoon'
 import { Home } from './pages/Home'
 import { MatchPage } from './pages/MatchPage'
+import { Wallet } from './pages/wallet/Wallet'
+import { AddMoney } from './pages/wallet/AddMoney'
+import { PaymentDetail } from './pages/wallet/PaymentDetail'
+import { Withdraw } from './pages/wallet/Withdraw'
+import { WithdrawalDetail } from './pages/wallet/WithdrawalDetail'
+import { Payments } from './pages/admin/Payments'
+import { Withdrawals } from './pages/admin/Withdrawals'
+import { Balances } from './pages/admin/Balances'
+import { MoneySettings } from './pages/admin/MoneySettings'
 import { Profile } from './pages/Profile'
 
 export default function App() {
@@ -25,7 +34,11 @@ export default function App() {
       <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
       <Route path="/me" element={<RequireAuth><Profile /></RequireAuth>} />
       <Route path="/match/:id" element={<RequireAuth><MatchPage /></RequireAuth>} />
-      <Route path="/wallet" element={<RequireAuth><ComingSoon title="Wallet" icon="wallet" text="Add money, withdraw and your history arrive in step 3." /></RequireAuth>} />
+      <Route path="/wallet" element={<RequireAuth><Wallet /></RequireAuth>} />
+      <Route path="/wallet/add" element={<RequireAuth><AddMoney /></RequireAuth>} />
+      <Route path="/wallet/payment/:id" element={<RequireAuth><PaymentDetail /></RequireAuth>} />
+      <Route path="/wallet/withdraw" element={<RequireAuth><Withdraw /></RequireAuth>} />
+      <Route path="/wallet/withdrawal/:id" element={<RequireAuth><WithdrawalDetail /></RequireAuth>} />
       <Route path="/ranks" element={<RequireAuth><ComingSoon title="Ranks" icon="trophy" text="The leaderboard arrives once games are live." /></RequireAuth>} />
 
       <Route path="/admin" element={<RequireAuth><RequireAdmin><AdminHome /></RequireAdmin></RequireAuth>} />
@@ -33,6 +46,10 @@ export default function App() {
       <Route path="/admin/members" element={<RequireAuth><RequireAdmin><Members /></RequireAdmin></RequireAuth>} />
       <Route path="/admin/matches" element={<RequireAuth><RequireAdmin><AdminMatches /></RequireAdmin></RequireAuth>} />
       <Route path="/admin/data" element={<RequireAuth><RequireAdmin><CricketData /></RequireAdmin></RequireAuth>} />
+      <Route path="/admin/payments" element={<RequireAuth><RequireAdmin><Payments /></RequireAdmin></RequireAuth>} />
+      <Route path="/admin/withdrawals" element={<RequireAuth><RequireAdmin><Withdrawals /></RequireAdmin></RequireAuth>} />
+      <Route path="/admin/balances" element={<RequireAuth><RequireAdmin><Balances /></RequireAdmin></RequireAuth>} />
+      <Route path="/admin/money" element={<RequireAuth><RequireAdmin><MoneySettings /></RequireAdmin></RequireAuth>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

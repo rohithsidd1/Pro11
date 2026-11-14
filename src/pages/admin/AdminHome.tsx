@@ -8,12 +8,15 @@ import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
 import { useCodes } from '../../lib/useCodes'
 import { useDataStatus } from '../../lib/useDataSettings'
+import { useMoneyQueue } from '../../lib/useWallet'
+import type { IconName } from '../../components/Icon'
 
 export function AdminHome() {
   const { profile } = useAuth()
   const toast = useToast()
   const { waiting, reload } = useCodes()
   const { used, settings } = useDataStatus()
+  const money = useMoneyQueue(true)
   const [members, setMembers] = useState(0)
   useEffect(() => {
     void supabase.from('profiles').select('id', { count: 'exact', head: true }).then(({ count }) => setMembers(count ?? 0))
@@ -31,12 +34,12 @@ export function AdminHome() {
         <Link to="/admin/codes" className="tile" style={{ ['--c' as string]: 'var(--lemon)' }}>
           <span className="tile-k">Sign-in codes waiting</span><span className="tile-v">{waiting.length}</span>
         </Link>
-        <Link to="/admin/members" className="tile" style={{ ['--c' as string]: 'var(--blue)' }}>
-          <span className="tile-k">Members</span><span className="tile-v">{members}</span>
+        <Link to="/admin/payments" className="tile" style={{ ['--c' as string]: 'var(--pink)' }}>
+          <span className="tile-k">Payments to check</span><span className="tile-v">{money.payments}</span>
         </Link>
-        <div className="tile" style={{ ['--c' as string]: 'var(--soft)' }}>
-          <span className="tile-k">Payments to check</span><span className="tile-v">–</span>
-        </div>
+        <Link to="/admin/withdrawals" className="tile" style={{ ['--c' as string]: 'var(--blue)' }}>
+          <span className="tile-k">Withdrawals to pay</span><span className="tile-v">{money.withdrawals}</span>
+        </Link>
         <Link to="/admin/data" className="tile" style={{ ['--c' as string]: 'var(--mint)' }}>
           <span className="tile-k">API credits today</span>
           <span>
@@ -53,9 +56,28 @@ export function AdminHome() {
         </>
       )}
 
+      <div className="sec"><h2>Manage</h2></div>
+      <div className="list" style={{ maxWidth: 560 }}>
+        {MANAGE.map((m) => (
+          <Link key={m.to} to={m.to} className="row">
+            <span className="ic"><Icon name={m.icon} /></span>
+            <span><span className="rt">{m.label}{m.to === '/admin/members' ? ` (${members})` : ''}</span><span className="rs">{m.sub}</span></span>
+            <Icon name="chev" />
+          </Link>
+        ))}
+      </div>
+
       <div className="sec"><h2>Safety</h2></div>
       <button className="btn danger" onClick={signEveryoneOut}><Icon name="logout" /><span>Sign everyone out</span></button>
-      <p className="fine">Payments and games join this dashboard in the next steps.</p>
+      <p className="fine">Games join this dashboard in the next steps.</p>
     </Shell>
   )
 }
+
+const MANAGE: { to: string; icon: IconName; label: string; sub: string }[] = [
+  { to: '/admin/members', icon: 'user', label: 'Members', sub: 'Roles, blocking, adjust a wallet' },
+  { to: '/admin/balances', icon: 'wallet', label: 'Balances', sub: 'Money you’re holding, export the ledger' },
+  { to: '/admin/money', icon: 'sliders', label: 'Money settings', sub: 'UPI ID, limits, accepted apps' },
+  { to: '/admin/matches', icon: 'stumps', label: 'Matches', sub: 'Show or hide matches' },
+  { to: '/admin/data', icon: 'gauge', label: 'Cricket data', sub: 'API credits and syncing' },
+]
