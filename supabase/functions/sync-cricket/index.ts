@@ -5,6 +5,7 @@
 // Every call to CricketData is checked against the daily credit cap and logged with its real cost.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { adminClient, cors, json } from '../_shared/util.ts'
+import { cbManual, tickCricbuzz } from './cricbuzz.ts'
 import { groupByFields, parseMatch, parseSquad, parseXi, squadFieldNames, type MatchRow, type TeamRow } from '../_shared/cricket.ts'
 
 const API = 'https://api.cricapi.com/v1'
@@ -502,6 +503,19 @@ Deno.serve(async (req) => {
     const mode = body.mode ?? 'tick'
     const matchId = body.matchId ? String(body.matchId) : null
 
+    // Cricbuzz (unofficial, free): the default source
+    if ((s as { data_source?: string }).data_source === 'cricbuzz') {
+      if (mode === 'tick' && !caller.userId) return json({ ok: true, result: await tickCricbuzz(ctx) })
+      if (mode === 'squad-for-entry' && matchId?.startsWith('cb-') && caller.userId) {
+        const { data: mine } = await db.from('entries').select('id, contests!inner(match_id)').eq('user_id', caller.userId).eq('contests.match_id', matchId).limit(1)
+        if (!mine?.length) return json({ error: 'Join the game first.' }, 403)
+        return json({ ok: true, result: await cbManual(ctx, 'squad-for-entry', matchId) })
+      }
+      if (caller.isAdmin && (matchId?.startsWith('cb-') || mode === 'list' || mode === 'fixtures')) {
+        const r = await cbManual(ctx, mode, matchId)
+        if (r) return json({ ok: true, result: r })
+      }
+    }
     if (mode === 'tick' && !caller.userId) return json({ ok: true, result: await tick(ctx) })
 
     // A member who joined a game can trigger the one-time squad fetch for that match.

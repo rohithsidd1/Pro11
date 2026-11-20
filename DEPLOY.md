@@ -1,24 +1,24 @@
-# Deploy this version
+# Deploy this version (Cricbuzz data)
 
-Everything here is safe to run again if you're unsure whether you already did it.
+Safe to repeat any step.
 
 1. **Database** · Supabase → SQL Editor → paste `pro11-database-update.sql` → Run (choose Run if it warns).
-   Safe whether or not you ran any earlier database file. It also turns syncing back on.
+   Works whatever you ran before. Switches Pro11 to Cricbuzz and makes the sync run every 5 minutes.
 
-2. **Functions** · `sync-cricket` changed (and `verify-code`, if you haven't deployed it since the audit fixes). Make a brand-new token at
-   supabase.com/dashboard/account/tokens (delete every old one), never paste it in a chat, then from this folder:
+2. **Code** · copy the new files into your `pro11` folder and push. Netlify deploys the app and the Cricbuzz reader.
    ```bash
-   export SUPABASE_ACCESS_TOKEN=your_new_token
-   for f in sync-cricket verify-code; do npx supabase functions deploy $f --no-verify-jwt --project-ref mdtqgovuodwspxztsvps; done
+   cd ~/Downloads && rm -rf /tmp/pro11-new && unzip -q -o pro11-update.zip -d /tmp/pro11-new && rsync -av --exclude '.git' --exclude 'node_modules' --exclude '.env.local' /tmp/pro11-new/pro11/ ~/Downloads/pro11/ && cd ~/Downloads/pro11 && git add . && git commit -m "Cricbuzz data" && git push
+   ```
+
+3. **Sync function** · make a NEW token at supabase.com/dashboard/account/tokens (delete old ones), then:
+   ```bash
+   cd ~/Downloads/pro11
+   export SUPABASE_ACCESS_TOKEN=PASTE_NEW_TOKEN
+   npx supabase functions deploy sync-cricket --no-verify-jwt --project-ref mdtqgovuodwspxztsvps
    unset SUPABASE_ACCESS_TOKEN
    ```
-   Delete the token afterwards.
 
-3. **Code** · copy the new files into your `pro11` folder and push. Netlify deploys by itself.
-   ```bash
-   cd ~/Downloads
-   rsync -av --exclude '.git' --exclude 'node_modules' --exclude '.env.local' "pro11 2/" pro11/
-   cd pro11 && git add . && git commit -m "Audit fixes" && git push
-   ```
+4. **Check** · after a minute open https://playpro11.netlify.app/.netlify/functions/cricbuzz?debug=1
+   and send the result to Claude. Then Admin → Cricket data → Refresh match list and Load schedules.
 
-4. **Check** · Admin → Cricket data: syncing on; tap Refresh match list and Load schedules once.
+No new keys or settings are needed.

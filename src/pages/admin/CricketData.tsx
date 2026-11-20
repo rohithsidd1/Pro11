@@ -8,6 +8,8 @@ import { useToast } from '../../lib/toast'
 import type { DataSettings } from '../../lib/types'
 import { useDataStatus } from '../../lib/useDataSettings'
 import { useSettingsForm } from '../../lib/useSettingsForm'
+import { CricbuzzPanel } from '../../components/CricbuzzPanel'
+import { useAuth } from '../../lib/auth'
 import { reportSummary, useMatchReport } from '../../components/MatchReport'
 import { Link } from 'react-router-dom'
 
@@ -18,6 +20,7 @@ const ENDPOINT: Record<string, string> = {
 const hrs = (h: number) => (Math.abs(h) >= 48 ? `${Math.round(h / 24)} d` : `${Math.round(h)} h`)
 
 export function CricketData() {
+  const isCb = ((useAuth().settings as unknown as { data_source?: string })?.data_source ?? 'cricbuzz') === 'cricbuzz'
   const toast = useToast()
   const { settings, usage, calls, used, reload } = useDataStatus()
   const [form, setForm] = useState<DataSettings | null>(null)
@@ -93,10 +96,11 @@ export function CricketData() {
   )
 
   return (
-    <Shell title="Cricket data" kicker="API and syncing">
+    <Shell title="Cricket data" kicker={isCb ? 'Cricbuzz (free)' : 'CricketData API'}>
       <div className="cols-2">
-        <div>
-          <section className="panel">
+        <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
+          <CricbuzzPanel />
+          {!isCb && <section className="panel">
             <p className="rt">API credits today</p>
             <div className="bigmeter" style={{ marginTop: 8 }}><span className="v">{used}</span><span className="of">/ {cap}</span></div>
             <span className={pct >= 85 ? 'meter warn' : 'meter'} style={{ marginTop: 12 }}><i style={{ width: `${pct}%` }} /></span>
@@ -111,11 +115,12 @@ export function CricketData() {
               Last match list: {settings?.last_list_sync_at ? `${istDayName(settings.last_list_sync_at)} ${istTime(settings.last_list_sync_at)}` : 'never'}.
               {' '}Last schedules: {settings?.last_fixtures_sync_at ? `${istDayName(settings.last_fixtures_sync_at)} ${istTime(settings.last_fixtures_sync_at)}` : 'never'}.
             </p>
-          </section>
+          </section>}
 
           {form && (
             <section className="panel" style={{ marginTop: 8 }}>
               <div className="ch"><h3>Syncing</h3></div>
+              {!isCb && <>
               <NumberRule k="daily_credit_cap" label="Daily credit limit" sub="Stops automatic and manual syncing here" min={1} max={100000} />
               <NumberRule k="list_refresh_hours" label="Refresh the match list every" sub="Live, recent and starting-soon matches; 1 credit per 25 matches" min={1} max={24} unit="hrs" />
               <NumberRule k="fixtures_refresh_hours" label="Load series schedules every" sub="Tomorrow’s and later matches of the series being played" min={1} max={48} unit="hrs" />
@@ -131,6 +136,8 @@ export function CricketData() {
                 <input type="checkbox" role="switch" className="switch" checked={settings?.auto_xi_check ?? false} onChange={(e) => setOption(settings?.only_game_ready ?? true, e.target.checked)} />
               </label>
               <LiveScores />
+              </>}
+              {isCb && <Toggle k="sync_paused" label="Pause all syncing" sub="Nothing is fetched until you turn this off" />}
               <div className="ch" style={{ marginTop: 18 }}><h3>Which matches to show</h3></div>
               <Toggle k="show_men_intl" label="Men’s internationals" />
               <Toggle k="show_women_intl" label="Women’s internationals" />
@@ -183,7 +190,7 @@ export function CricketData() {
               </div>
             )}
         </section>
-        <section className="panel">
+        {!isCb && <section className="panel">
           <div className="ch"><h3>Recent API calls</h3><span className="help">newest first</span></div>
           {calls.length === 0 ? <p className="help">No calls yet. Tap Refresh match list to make the first one.</p> : (
             <div className="tscroll">
@@ -205,7 +212,7 @@ export function CricketData() {
               </table>
             </div>
           )}
-        </section>
+        </section>}
         </div>
       </div>
     </Shell>

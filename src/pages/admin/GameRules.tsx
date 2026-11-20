@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { Shell } from '../../components/Shell'
+import { PointsRules } from '../../components/PointsRules'
 import { errorText } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
@@ -15,6 +16,7 @@ interface Extra {
 }
 
 export function GameRules() {
+  const isCb = ((useAuth().settings as unknown as { data_source?: string })?.data_source ?? 'cricbuzz') === 'cricbuzz'
   const { settings, refresh } = useAuth()
   const toast = useToast()
   const [f, setF] = useState<GameSettings | null>(null)
@@ -132,6 +134,7 @@ export function GameRules() {
           <div>
             <TNum k="fx_captain_mult" label="Captain multiplier" min={1} max={5} step={0.5} />
             <TNum k="fx_vice_mult" label="Vice-captain multiplier" min={1} max={5} step={0.5} />
+            {!isCb && <>
             <label className="rule" style={{ cursor: 'pointer' }}>
               <div><p className="k">Live points during the match</p><p className="s">One update around the innings break, 10 credits a game</p></div>
               <input type="checkbox" role="switch" className="switch" checked={t.fx_live_update} onChange={(e) => setT({ ...t, fx_live_update: e.target.checked })} />
@@ -141,9 +144,11 @@ export function GameRules() {
               <div><p className="k">Full scorecard after the match</p><p className="s">Batting and bowling card, 10 credits a match. Off: totals and top performers only (free).</p></div>
               <input type="checkbox" role="switch" className="switch" checked={x.full_scorecard} onChange={(e) => setX({ ...x, full_scorecard: e.target.checked })} />
             </label>
+            </>}
           </div>
         </div>
       </section>
+      <PointsRules />
       <section className="panel" style={{ marginTop: 8 }}>
         <div className="ch"><h3>Bonus points</h3><span className="help">leaderboard only, never money</span></div>
         <div className="cols-2" style={{ gap: 16 }}>
