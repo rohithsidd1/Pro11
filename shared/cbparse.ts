@@ -92,10 +92,12 @@ export function parseSlug(slug: string): Partial<CbMatch> {
 // ---------------- embedded JSON (Cricbuzz's current Next.js pages) ----------------
 /** All text that may hold JSON: plain HTML, Next.js flight data (self.__next_f.push) unescaped, __NEXT_DATA__. */
 export function jsonText(html: string): string {
-  let out = html
+  // Next.js streams its page data in pieces that can cut through the middle of an object: join them as they are.
+  let flight = ''
   for (const m of html.matchAll(/self\.__next_f\.push\(\[\d+,\s*"((?:[^"\\]|\\.)*)"\]\)/g)) {
-    try { out += '\n' + JSON.parse(`"${m[1]}"`) } catch { /* skip */ }
+    try { flight += JSON.parse(`"${m[1]}"`) } catch { /* skip */ }
   }
+  let out = html + '\n' + flight
   const nd = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
   if (nd) out += '\n' + nd[1]
   return out
