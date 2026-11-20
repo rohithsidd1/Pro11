@@ -59,7 +59,7 @@ export function useGamesFor(matchIds: string[]) {
 }
 
 export type DayTab = 'Today' | 'Tomorrow' | 'Later' | 'Live' | 'Mine'
-export type FormatChip = 'All' | 'T20' | 'ODI' | 'Test' | 'Women'
+export type FormatChip = 'All' | 'T20' | 'ODI' | 'Test'
 
 /**
  * Today / Tomorrow / Later: matches that haven't started. Live: started and not finished; for members only the
@@ -78,7 +78,7 @@ export function filterMatches(all: Match[], tab: DayTab, chip: FormatChip, mine?
     if (tab === 'Tomorrow') return s >= t1 && s < t2
     return s >= t2
   })
-  const byChip = byTab.filter((m) => chip === 'All' || (chip === 'Women' ? m.is_women : m.format === chip))
+  const byChip = byTab.filter((m) => chip === 'All' || m.format === chip)
   if (tab === 'Mine') {
     // live first, then upcoming soonest first, then finished most recent first
     const rank = (m: Match) => (live(m) ? 0 : upcoming(m) ? 1 : 2)

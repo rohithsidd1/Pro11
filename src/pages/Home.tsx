@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { pushAsked, pushPermission } from '../lib/push'
 import { money, useLedger } from '../lib/useLedger'
@@ -16,7 +16,7 @@ import { SearchBar, useQuery } from '../components/SearchBar'
 import { smartFilter } from '../lib/search'
 
 const TAB_LABEL: Record<DayTab, string> = { Today: 'Today', Tomorrow: 'Tomorrow', Later: 'Later', Live: 'Live', Mine: 'My games' }
-const CHIPS: FormatChip[] = ['All', 'T20', 'ODI', 'Test', 'Women']
+const CHIPS: FormatChip[] = ['All', 'T20', 'ODI', 'Test']
 
 export function Home() {
   const { profile, settings } = useAuth()
@@ -30,6 +30,21 @@ export function Home() {
   const location = useLocation()
   const [tab, setTab] = useState<DayTab>((location.state as { tab?: DayTab } | null)?.tab ?? (cfg.home_tab === 'Mine' ? 'Mine' : 'Today'))
   const [query, setQuery] = useQuery('home')
+  // the day tabs scroll sideways: fade the edge that has more, and keep the selected tab in view
+  const tabsRef = useRef<HTMLElement>(null)
+  const fadeTabs = useCallback(() => {
+    const n = tabsRef.current
+    if (!n) return
+    n.classList.toggle('fade-l', n.scrollLeft > 2)
+    n.classList.toggle('fade-r', n.scrollLeft + n.clientWidth < n.scrollWidth - 2)
+  }, [])
+  useEffect(() => {
+    const n = tabsRef.current
+    n?.querySelector<HTMLElement>('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
+    fadeTabs()
+    window.addEventListener('resize', fadeTabs)
+    return () => window.removeEventListener('resize', fadeTabs)
+  }, [tab, query, fadeTabs])
   const [chip, setChip] = useState<FormatChip>('All')
   const found = query ? smartFilter(matches, query, (m) => [m.team_a, m.team_b, m.team_a_short, m.team_b_short, m.series_name, m.label, m.venue, m.format, m.category, m.is_women ? 'women' : '', m.status_text]) : []
   const games = useGamesFor(query ? found.map((x) => x.id) : matches.map((m) => m.id))
@@ -59,7 +74,7 @@ export function Home() {
       <div className="search-wrap"><SearchBar value={query} onChange={setQuery} placeholder="Search teams, series, cities" label="Search matches" /></div>
       {!query ? (<>
       <div className="controls">
-        <nav className="tabs" aria-label="Match lists">
+        <nav className="tabs scroll-x" aria-label="Match lists" ref={tabsRef} onScroll={fadeTabs}>
           {TABS.map((t) => (
             <button key={t} className="tab-pill" aria-pressed={tab === t} onClick={() => setTab(t)}>
               <span className="tx">{TAB_LABEL[t]}</span>
@@ -80,7 +95,7 @@ export function Home() {
       )}
       <SkSwap loading={loading} skeleton={<SkCards n={4} />}>
       {!error && shown.length === 0 && (
-        <Empty icon="stumps" title={tab === 'Mine' ? 'You haven’t joined a game yet' : tab === 'Live' ? 'None of your matches are live' : `No ${chip === 'All' ? '' : chip === 'Women' ? 'women’s ' : `${chip} `}matches ${tab === 'Later' ? 'after tomorrow yet' : tab === 'Today' ? 'left today' : 'tomorrow yet'}`}
+        <Empty icon="stumps" title={tab === 'Mine' ? 'You haven’t joined a game yet' : tab === 'Live' ? 'No matches are live right now' : `No ${chip === 'All' ? '' : `${chip} `}matches ${tab === 'Later' ? 'after tomorrow yet' : tab === 'Today' ? 'left today' : 'tomorrow yet'}`}
           action={chip !== 'All' ? <button className="btn primary" onClick={() => setChip('All')}><span>Show all formats</span></button> : undefined}>
           {tab === 'Live' ? 'Live matches show here while they’re being played.' : 'New matches appear by themselves as Cricbuzz lists them.'}
         </Empty>
