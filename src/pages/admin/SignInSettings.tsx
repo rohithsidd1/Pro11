@@ -5,6 +5,7 @@ import { errorText } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
+import { SkPanel } from '../../components/Skeleton'
 
 interface F { code_length: number; code_ttl_minutes: number; session_days: number; code_requests_per_hour: number; members_only_codes: boolean }
 
@@ -14,7 +15,7 @@ export function SignInSettings() {
   const [f, setF] = useState<F | null>(null)
   const [busy, setBusy] = useState(false)
   useEffect(() => { if (settings) setF(settings as unknown as F) }, [settings])
-  if (!f) return <Shell title="Sign-in settings" back="/admin"><p className="help">Loading…</p></Shell>
+  if (!f) return <Shell title="Sign-in settings" back="/admin"><SkPanel lines={6} /></Shell>
   const save = async () => {
     setBusy(true)
     const { error } = await supabase.from('app_settings').update({

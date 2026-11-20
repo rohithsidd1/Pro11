@@ -4,14 +4,14 @@ import { Icon, type IconName } from '../components/Icon'
 import { Shell } from '../components/Shell'
 import { istDayName, istTime } from '../lib/ist'
 import { useNotifications, type Notice } from '../lib/useNotifications'
+import { SkRows } from '../components/Skeleton'
 
 const ICON: Record<string, [IconName, string]> = {
-  payment_approved: ['down', 'var(--ok-bg)'], payment_rejected: ['x', 'var(--bad-bg)'], payment_waiting: ['receipt', 'var(--warn-bg)'],
-  withdrawal_paid: ['up', 'var(--ok-bg)'], withdrawal_rejected: ['x', 'var(--bad-bg)'], withdrawal_waiting: ['up', 'var(--warn-bg)'],
-  wallet_adjusted: ['sliders', 'var(--soft)'], contest_scored: ['trophy', 'var(--lemon)'], contest_paid: ['trophy', 'var(--mint)'],
+  contest_scored: ['trophy', 'var(--lemon)'], contest_paid: ['trophy', 'var(--mint)'],
   contest_cancelled: ['ban', 'var(--soft)'],
   squads_out: ['stumps', 'var(--mint)'], xi_out: ['user', 'var(--mint)'], lock_soon: ['clock', 'var(--warn-bg)'],
   admin_alert: ['alert', 'var(--warn-bg)'], broadcast: ['send', 'var(--lemon)'],
+  payment_claimed: ['wallet', 'var(--warn-bg)'], payment_confirmed: ['check', 'var(--ok-bg)'], payment_disputed: ['x', 'var(--bad-bg)'],
 }
 
 export function Notifications() {
@@ -21,7 +21,8 @@ export function Notifications() {
   return (
     <Shell title="Notifications" back="/" kicker={unread ? `${unread} unread` : 'All caught up'}
       actions={unread > 0 ? <button className="btn sm" onClick={() => markRead(items.filter((n) => !n.read_at).map((n) => n.id))}><Icon name="check" small /><span>Read all</span></button> : undefined}>
-      {!loading && items.length === 0 && <Empty icon="bell" title="Nothing yet">Payments, withdrawals and game results show up here.</Empty>}
+      {loading && <SkRows n={6} />}
+      {!loading && items.length === 0 && <Empty icon="bell" title="Nothing yet">Game results, alerts and payments to confirm show up here.</Empty>}
       <div className="list" style={{ maxWidth: 720 }}>
         {items.map((n) => {
           const [icon, bg] = ICON[n.kind] ?? ['bell', 'var(--soft)']

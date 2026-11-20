@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { clock } from '../../lib/time'
 import type { CodeStatus } from '../../lib/types'
 import { useCodes } from '../../lib/useCodes'
+import { SkRows } from '../../components/Skeleton'
 
 const STATUS: Record<CodeStatus, { label: string; cls: string }> = {
   pending: { label: 'Expired', cls: 'tag' },
@@ -19,9 +20,10 @@ const STATUS: Record<CodeStatus, { label: string; cls: string }> = {
 export function SignInCodes() {
   const { waiting, notMembers, earlier, loading, reload } = useCodes()
   return (
-    <Shell title="Sign-in codes" kicker={`${waiting.length} waiting`}>
+    <Shell title="Sign-in codes" back="/admin" kicker={`${waiting.length} waiting`}>
       <div className="cols-2">
         <div>
+          {loading && <SkRows n={3} />}
           {waiting.length === 0 && !loading && (
             <Empty icon="key" title="No codes waiting">When someone asks to sign in, their code shows up here.</Empty>
           )}

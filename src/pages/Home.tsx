@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { pushAsked, pushPermission } from '../lib/push'
-import { rupees } from '../lib/money'
-import { useWallet } from '../lib/useWallet'
+import { money, useLedger } from '../lib/useLedger'
 import { Empty } from '../components/Empty'
 import { Icon } from '../components/Icon'
 import { MatchCard } from '../components/MatchCard'
@@ -11,6 +10,7 @@ import { Bell } from '../components/Bell'
 import { useAuth } from '../lib/auth'
 import { CARD_COLORS } from '../lib/cricket'
 import { filterMatches, useGamesFor, useMatchFeed, type DayTab, type FormatChip } from '../lib/useMatches'
+import { Sk, SkCards } from '../components/Skeleton'
 
 const TAB_LABEL: Record<DayTab, string> = { Today: 'Today', Tomorrow: 'Tomorrow', Later: 'Later', Live: 'Live', Mine: 'My games' }
 const CHIPS: FormatChip[] = ['All', 'T20', 'ODI', 'Test', 'Women']
@@ -22,8 +22,9 @@ export function Home() {
   const navigate = useNavigate()
   useEffect(() => { if (!pushAsked() && pushPermission() === 'default') navigate('/alerts') }, [navigate])
   const { matches, loading, error, reload } = useMatchFeed('match_feed')
-  const { balance, loading: walletLoading } = useWallet()
-  const [tab, setTab] = useState<DayTab>(cfg.home_tab === 'Mine' ? 'Mine' : 'Today')
+  const { balances, total } = useLedger()
+  const location = useLocation()
+  const [tab, setTab] = useState<DayTab>((location.state as { tab?: DayTab } | null)?.tab ?? (cfg.home_tab === 'Mine' ? 'Mine' : 'Today'))
   const [chip, setChip] = useState<FormatChip>('All')
   const games = useGamesFor(matches.map((m) => m.id))
   const mineSet = new Set([...games.entries()].filter(([, g]) => g.mine).map(([id]) => id))
@@ -34,14 +35,15 @@ export function Home() {
   return (
     <Shell title="Matches" kicker={profile ? `Hi ${profile.name.split(' ')[0]}` : undefined}
       actions={<>
-        <Link to="/wallet" className="wallet-chip" aria-label={`Wallet, ${rupees(balance)}`}><Icon name="wallet" small /><span>{walletLoading ? '…' : rupees(balance)}</span></Link>
+        <Link to="/ledger" className="wallet-chip" aria-label="Ledger" style={{ color: total > 0.004 ? 'var(--ok)' : total < -0.004 ? 'var(--bad)' : undefined }}>
+          <Icon name="wallet" small /><span>{!balances ? '…' : total > 0.004 ? `You get ${money(total)}` : total < -0.004 ? `You owe ${money(-total)}` : 'Settled'}</span></Link>
         <Bell />
       </>}>
       <div className="hero-card">
         <div>
           <p className="kicker">Cricket</p>
           <p className="brand">{(cfg.app_name ?? 'Pro11').toUpperCase()}</p>
-          <p className="lead"><span className="num">{todayCount}</span> {todayCount === 1 ? 'match' : 'matches'} still to start today{liveCount ? <>, <span className="num">{liveCount}</span> of yours live</> : ''}</p>
+          <p className="lead">{loading ? <Sk w={200} h={14} /> : <><span className="num">{todayCount}</span> {todayCount === 1 ? 'match' : 'matches'} still to start today</>}{liveCount ? <>, <span className="num">{liveCount}</span> of yours live</> : ''}</p>
         </div>
         <svg className="ball" aria-hidden="true"><use href="#ball" /></svg>
       </div>
@@ -66,10 +68,11 @@ export function Home() {
           Check your connection.
         </Empty>
       )}
+      {loading && <SkCards n={4} />}
       {!error && !loading && shown.length === 0 && (
         <Empty icon="stumps" title={tab === 'Mine' ? 'You haven’t joined a game yet' : tab === 'Live' ? 'None of your matches are live' : `No ${chip === 'All' ? '' : chip === 'Women' ? 'women’s ' : `${chip} `}matches ${tab === 'Later' ? 'after tomorrow yet' : tab === 'Today' ? 'left today' : 'tomorrow yet'}`}
           action={chip !== 'All' ? <button className="btn primary" onClick={() => setChip('All')}><span>Show all formats</span></button> : undefined}>
-          {tab === 'Live' ? 'Matches you’ve joined show here while they’re being played.' : 'New matches appear automatically as CricketData publishes them.'}
+          {tab === 'Live' ? 'Matches you’ve joined show here while they’re being played.' : 'New matches appear by themselves as Cricbuzz lists them.'}
         </Empty>
       )}
       {shown.length > 0 && (

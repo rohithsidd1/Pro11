@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
 import type { GameSettings, TeamRules } from '../../lib/types'
+import { SkPanel } from '../../components/Skeleton'
 
 type Fmt = 'T20' | 'ODI' | 'Test'
 interface Extra {
@@ -16,7 +17,6 @@ interface Extra {
 }
 
 export function GameRules() {
-  const isCb = ((useAuth().settings as unknown as { data_source?: string })?.data_source ?? 'cricbuzz') === 'cricbuzz'
   const { settings, refresh } = useAuth()
   const toast = useToast()
   const [f, setF] = useState<GameSettings | null>(null)
@@ -33,7 +33,7 @@ export function GameRules() {
       bonus_join: all.bonus_join ?? 5, bonus_win: all.bonus_win ?? 50, bonus_second: all.bonus_second ?? 20, bonus_perfect: all.bonus_perfect ?? 25,
       bonus_reset: all.bonus_reset ?? 'month', show_bonus: all.show_bonus ?? true, fx_ruleset: all.fx_ruleset ?? 0, full_scorecard: all.full_scorecard ?? false })
   }, [settings])
-  if (!f || !t || !x) return <Shell title="Game rules" back="/admin"><p className="help">Loading…</p></Shell>
+  if (!f || !t || !x) return <Shell title="Game rules" back="/admin"><div style={{ display: 'grid', gap: 8 }}><SkPanel lines={6} /><SkPanel lines={8} /></div></Shell>
   const setFee = (game: 'xi' | 'fantasy', v: number) => setX({ ...x, fees: { ...x.fees, [fmt]: { ...x.fees[fmt], [game]: v }, ...(fmt === 'T20' ? { Other: { ...x.fees.Other, [game]: v } } : {}) } })
   const XNum = ({ k, label, sub, min = 0, max = 1000 }: { k: 'max_players' | 'bonus_join' | 'bonus_win' | 'bonus_second' | 'bonus_perfect' | 'fx_ruleset'; label: string; sub?: string; min?: number; max?: number }) => (
     <div className="rule"><div><p className="k">{label}</p>{sub && <p className="s">{sub}</p>}</div>
@@ -112,7 +112,7 @@ export function GameRules() {
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="help num">₹</span><input className="num-in" type="number" min={0} value={x.fees[fmt].fantasy} aria-label="Fantasy XI entry" onChange={(e) => setFee('fantasy', Math.max(0, Math.floor(Number(e.target.value) || 0)))} /></span></div>
           <label className="rule" style={{ cursor: 'pointer' }}><p className="k">Open Predict the XI on new matches</p><input type="checkbox" role="switch" className="switch" checked={x.open_xi} onChange={(e) => setX({ ...x, open_xi: e.target.checked })} /></label>
           <label className="rule" style={{ cursor: 'pointer' }}><p className="k">Open Fantasy XI on new matches</p><input type="checkbox" role="switch" className="switch" checked={x.open_fantasy} onChange={(e) => setX({ ...x, open_fantasy: e.target.checked })} /></label>
-          <Num k="min_players" label="Fewest players to run" sub="Fewer at the lock: cancelled and refunded" min={2} max={100} />
+          <Num k="min_players" label="Fewest players to run" sub="Fewer at the lock: the game is cancelled" min={2} max={100} />
           <XNum k="max_players" label="Most players in a game" min={2} max={100} />
           <div className="rule stacked"><p className="k">Payout</p>
             <div className="seg sm"><button aria-pressed={x.payout_mode === 'winner'} onClick={() => setX({ ...x, payout_mode: 'winner' })}>Winner takes all</button><button aria-pressed={x.payout_mode === 'top2'} onClick={() => setX({ ...x, payout_mode: 'top2' })}>Top 2 split 70/30</button></div>
@@ -134,17 +134,6 @@ export function GameRules() {
           <div>
             <TNum k="fx_captain_mult" label="Captain multiplier" min={1} max={5} step={0.5} />
             <TNum k="fx_vice_mult" label="Vice-captain multiplier" min={1} max={5} step={0.5} />
-            {!isCb && <>
-            <label className="rule" style={{ cursor: 'pointer' }}>
-              <div><p className="k">Live points during the match</p><p className="s">One update around the innings break, 10 credits a game</p></div>
-              <input type="checkbox" role="switch" className="switch" checked={t.fx_live_update} onChange={(e) => setT({ ...t, fx_live_update: e.target.checked })} />
-            </label>
-            <XNum k="fx_ruleset" label="CricketData points ruleset" sub="0 = their standard rules. Make your own in your CricketData member area and enter its number." max={100000} />
-            <label className="rule" style={{ cursor: 'pointer' }}>
-              <div><p className="k">Full scorecard after the match</p><p className="s">Batting and bowling card, 10 credits a match. Off: totals and top performers only (free).</p></div>
-              <input type="checkbox" role="switch" className="switch" checked={x.full_scorecard} onChange={(e) => setX({ ...x, full_scorecard: e.target.checked })} />
-            </label>
-            </>}
           </div>
         </div>
       </section>

@@ -1,12 +1,13 @@
 import { Icon } from '../../components/Icon'
 import { Shell } from '../../components/Shell'
 import { useSettingsForm } from '../../lib/useSettingsForm'
+import { SkPanel } from '../../components/Skeleton'
 
 type G = { app_name: string; admin_name: string; home_tab: 'Today' | 'Mine' }
 
 export function GeneralSettings() {
   const { f, set, save, busy } = useSettingsForm<G>(['app_name', 'admin_name', 'home_tab'])
-  if (!f) return <Shell title="General" back="/admin"><p className="help">Loading…</p></Shell>
+  if (!f) return <Shell title="General" back="/admin"><SkPanel lines={5} /></Shell>
   return (
     <Shell title="General" back="/admin">
       <section className="panel" style={{ maxWidth: 640 }}>

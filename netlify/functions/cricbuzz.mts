@@ -142,7 +142,7 @@ export default async (req: Request) => {
         if (!body.id) return json({ error: 'id needed' }, 400)
         const { sc, sources } = await scorecardFor(body.id, body.slug)
         const xi = sc.teams.flatMap((t) => t.players.filter((p) => p.group === 'playing').map((p) => p.id))
-        const points = computePoints(sc, rulesFor(body.format ?? 'T20', body.rules), xi, body.roles ?? {})
+        const points = computePoints(sc, rulesFor(body.format ?? 'T20', body.rules), xi, body.roles ?? {}, body.format ?? 'T20')
         return json({ scorecard: sc, points, sources })
       }
       case 'roles': return json(await roles(body.players ?? [], body.id ? { id: body.id, slug: body.slug } : undefined))

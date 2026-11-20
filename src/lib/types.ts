@@ -26,13 +26,6 @@ export interface AppSettings {
   code_requests_per_hour: number
   members_only_codes: boolean
   session_epoch: number
-  min_topup?: number
-  max_topup?: number
-  min_withdrawal?: number
-  accept_phonepe?: boolean
-  accept_gpay?: boolean
-  accept_paytm?: boolean
-  accept_other_upi?: boolean
 }
 
 export type CodeStatus = 'pending' | 'used' | 'expired' | 'blocked' | 'ignored'
@@ -96,7 +89,6 @@ export interface Match {
   info_fetched_at: string | null
   last_synced_at: string
   xi_checked_at?: string | null
-  squad_attempted_at?: string | null
   series_id?: string | null
   live_points_at?: string | null
   final_points_at?: string | null
@@ -116,46 +108,13 @@ export interface MatchPlayer {
 }
 
 export interface DataSettings {
-  daily_credit_cap: number
-  list_refresh_hours: number
-  fixtures_refresh_hours: number
-  fixtures_pages: number
   show_men_intl: boolean
   show_women_intl: boolean
   show_leagues: boolean
   show_domestic: boolean
   sync_paused: boolean
-  last_list_sync_at: string | null
-  last_fixtures_sync_at: string | null
-  only_game_ready?: boolean
-  auto_xi_check?: boolean
 }
 
-export interface ApiUsage { day: string; credits: number; calls: number; hits_today: number | null; hits_limit: number | null }
-export interface ApiCall { id: number; at: string; endpoint: string; match_id: string | null; credits: number; ok: boolean; trigger: 'auto' | 'admin'; note: string | null }
-
-export type TxnKind = 'topup' | 'withdrawal' | 'withdrawal_release' | 'entry' | 'refund' | 'payout' | 'adjustment'
-export interface WalletTxn { id: string; user_id: string; amount: number; kind: TxnKind; ref_id: string | null; note: string | null; created_by: string | null; created_at: string }
-
-export type ProofStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
-export interface PaymentProof {
-  id: string; user_id: string; amount: number; utr: string | null; app: 'phonepe' | 'gpay' | 'paytm' | 'other'
-  paid_at: string | null; paid_to: string | null; screenshot_path: string
-  ocr: { amount?: number | null; amountMatches?: boolean; utr?: string | null; paidAt?: string | null; paidTo?: string | null; toMatches?: boolean; text?: string }
-  status: ProofStatus; reject_reason: string | null; reviewed_by: string | null; reviewed_at: string | null; created_at: string
-}
-
-export type WithdrawalStatus = 'pending' | 'paid' | 'rejected' | 'cancelled'
-export interface Withdrawal {
-  id: string; user_id: string; amount: number; upi_id: string; status: WithdrawalStatus; utr: string | null; proof_path: string | null
-  reject_reason: string | null; handled_by: string | null; handled_at: string | null; created_at: string
-}
-
-export interface MoneySettings {
-  upi_id: string; payee_name: string; admin_phone: string; admin_name: string
-  min_topup: number; max_topup: number; min_withdrawal: number
-  accept_phonepe: boolean; accept_gpay: boolean; accept_paytm: boolean; accept_other_upi: boolean
-}
 
 export type GameKind = 'xi' | 'fantasy'
 export type ContestStatus = 'open' | 'locked' | 'scored' | 'paid' | 'cancelled'

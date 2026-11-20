@@ -13,12 +13,15 @@ import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
 import type { MatchPlayer } from '../../lib/types'
 import { ROLE_LABEL, ROLE_ORDER, ROLE_PLURAL, teamRules, useContest, useMatchAndSquad } from '../../lib/useGames'
+import { SkScreen } from '../../components/Skeleton'
+import { SavedSheet } from '../../components/SavedSheet'
 
 type Role = MatchPlayer['role']
 const SHORT: Record<Role, string> = { WK: 'WK', BAT: 'BAT', AR: 'AR', BOWL: 'BOWL' }
 
 export function PickFantasy() {
   const { id = '' } = useParams()
+  const [saved, setSaved] = useState<{ title: string; detail: string } | null>(null)
   const toast = useToast()
   const { settings } = useAuth()
   const rules = teamRules(settings)
@@ -48,8 +51,8 @@ export function PickFantasy() {
   }, [match?.id, players.length])
 
   const byId = useMemo(() => new Map(players.map((p) => [p.player_id, p])), [players])
-  if (l1 || l2) return <Shell title="Fantasy XI" back={`/match/${id}`}><p className="help">Loading…</p></Shell>
-  if (!match || !contest) return <Shell title="Fantasy XI" back="/"><Empty icon="stumps" title="Game not found" /></Shell>
+  if (l1 || l2) return <Shell title="Fantasy XI" back={`/match/${id}`}><SkScreen hero={false} rows={8} /></Shell>
+  if (!match || !contest) return <Shell title="Fantasy XI" back="/"><Empty icon="stumps" title="This game isn’t available" action={<Link className="btn" to="/"><span>Back to matches</span></Link>}>The match may have been removed from the list, or the game wasn’t run.</Empty></Shell>
   if (!mine) return <Navigate to={`/match/${id}`} replace />
 
   const open = contest.status === 'open' && new Date(contest.lock_at).getTime() > Date.now()
@@ -85,7 +88,7 @@ export function PickFantasy() {
     setBusy(false)
     if (error) return toast(errorText(error))
     setDirty(false); await reload(); setStep('preview')
-    toast(`Team saved. You can change it until ${istTime(contest.lock_at)}.`)
+    setSaved({ title: 'Team saved', detail: `11 players, with ${byId.get(cap)?.name ?? 'your captain'} as captain (${rules.captain}×) and ${byId.get(vice)?.name ?? 'your vice-captain'} as vice-captain (${rules.vice}×).` })
   }
 
   const list = players.filter((p) => p.role === role).sort((a, b) => a.team.localeCompare(b.team) || a.name.localeCompare(b.name))
@@ -95,7 +98,7 @@ export function PickFantasy() {
       actions={!open ? <Link className="btn sm" to={`/match/${id}/fantasy/results`}><Icon name="trophy" small /><span>Results</span></Link> : undefined}>
       <div className="pick-wrap">
         {players.length === 0 ? (
-          <Empty icon="user" title="Loading squads from CricketData…">This happens automatically. If CricketData has no squad for this league, the game is cancelled and your entry comes back.</Empty>
+          <Empty icon="user" title="Loading squads from Cricbuzz…">This happens by itself as soon as Cricbuzz publishes the squads. You can pick once they’re in.</Empty>
         ) : step === 'preview' || (!open && chosen.length === 11) ? (
           <>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -170,6 +173,7 @@ export function PickFantasy() {
           </div>
         )}
       </div>
+      {saved && <SavedSheet matchId={id} game="fantasy" title={saved.title} detail={saved.detail} lockAt={contest.lock_at} onClose={() => setSaved(null)} />}
     </Shell>
   )
 }

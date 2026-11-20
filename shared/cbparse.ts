@@ -4,6 +4,9 @@
 
 export type Fmt = 'T20' | 'ODI' | 'Test' | 'Other'
 export type State = 'upcoming' | 'live' | 'ended'
+/** A batter isn't dismissed if not out, still batting, retired (hurt or not out) or absent hurt. */
+export const NOT_OUT = /not out|batting|retired|absent/i
+
 export type Role = 'WK' | 'BAT' | 'AR' | 'BOWL'
 
 export interface CbMatch {
@@ -244,7 +247,7 @@ export function parseScorecard(html: string): CbScorecard {
       if (/cb-col-27/.test(row) && /cb-col-33/.test(row)) {
         const dm = row.match(/cb-col-33[^>]*>\s*(?:<span[^>]*>)?([\s\S]*?)(?:<\/span>)?\s*<\/div>/)
         const dismissal = dm ? text(dm[1]) : ''
-        inn.batting.push({ id: link[1], name, dismissal, r: num(nums[0]), b: num(nums[1]), fours: num(nums[2]), sixes: num(nums[3]), out: !!dismissal && !/^not out$|^batting$/i.test(dismissal) })
+        inn.batting.push({ id: link[1], name, dismissal, r: num(nums[0]), b: num(nums[1]), fours: num(nums[2]), sixes: num(nums[3]), out: !!dismissal && !NOT_OUT.test(dismissal) })
       } else if (/cb-col-40/.test(row) && nums.length >= 4) {
         inn.bowling.push({ id: link[1], name, overs: num(nums[0]), maidens: num(nums[1]), runs: num(nums[2]), wickets: num(nums[3]) })
       }
@@ -275,7 +278,7 @@ function parseScorecardJson(html: string, base: CbScorecard): Partial<CbScorecar
     innings.push({
       team: x.batTeamDetails?.batTeamName ?? x.batTeamName ?? '', score: '',
       r: x.scoreDetails?.runs ?? x.score, w: x.scoreDetails?.wickets ?? x.wickets, o: x.scoreDetails?.overs ?? x.overs,
-      batting: bats.filter((b) => b?.batId || b?.id).map((b) => ({ id: String(b.batId ?? b.id), name: b.batName ?? b.name ?? '', dismissal: b.outDesc ?? b.outdec ?? '', r: num(b.runs), b: num(b.balls), fours: num(b.fours), sixes: num(b.sixes), out: !!(b.outDesc ?? b.outdec) && !/not out|batting/i.test(b.outDesc ?? b.outdec) })),
+      batting: bats.filter((b) => b?.batId || b?.id).map((b) => ({ id: String(b.batId ?? b.id), name: b.batName ?? b.name ?? '', dismissal: b.outDesc ?? b.outdec ?? '', r: num(b.runs), b: num(b.balls), fours: num(b.fours), sixes: num(b.sixes), out: !!(b.outDesc ?? b.outdec) && !NOT_OUT.test(b.outDesc ?? b.outdec) })),
       bowling: bowls.filter((b) => b?.bowlId || b?.id).map((b) => ({ id: String(b.bowlId ?? b.id), name: b.bowlName ?? b.name ?? '', overs: num(b.overs), maidens: num(b.maidens), runs: num(b.runs), wickets: num(b.wickets) })),
       dnb: [],
     })
@@ -316,7 +319,11 @@ export function parseProfileRole(html: string): Role | undefined {
 // ---------------- current Cricbuzz pages (2026): read data by what it contains, not by field names ----------------
 // deno-lint-ignore no-explicit-any
 type J = any
-const pick = (o: J, keys: string[]) => { for (const k of keys) if (o?.[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]; return undefined }
+const real = (v: J) => v !== undefined && v !== null && v !== '' && !(typeof v === 'string' && /^\$/.test(v))
+const pick = (o: J, keys: string[]) => { for (const k of keys) if (real(o?.[k])) return o[k]; return undefined }
+/** "/cricket-team/arabian-aces/3623" → "Arabian Aces" */
+const nameFromTeamUrl = (u: J) => { const m = typeof u === 'string' ? u.match(/\/cricket-team\/([a-z0-9-]+)\/\d+/) : null
+  return m ? m[1].split('-').map((w) => (w.length <= 3 && w !== 'aces' ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1))).join(' ').replace(/\bA\b$/, 'A') : undefined }
 const ID = ['id', 'playerId', 'batId', 'bowlId', 'batsmanId', 'bowlerId', 'batid', 'bowlid']
 const NAME = ['name', 'fullName', 'playerName', 'batName', 'bowlName', 'batname', 'bowlname', 'nickName']
 
@@ -351,7 +358,7 @@ export function inningsFromJson(html: string): CbInnings[] {
       batting: bats.map((b) => {
         const dis = String(pick(b, ['outDesc', 'outdec', 'outDec', 'dismissal', 'dismissalText', 'outDescription']) ?? '')
         return { id: String(pick(b, ID)), name: String(pick(b, NAME) ?? ''), dismissal: dis, r: num(pick(b, ['runs', 'r'])), b: num(pick(b, ['balls', 'b'])),
-          fours: num(pick(b, ['fours', '4s', 'boundaries'])), sixes: num(pick(b, ['sixes', '6s'])), out: !!dis && !/not out|batting/i.test(dis) }
+          fours: num(pick(b, ['fours', '4s', 'boundaries'])), sixes: num(pick(b, ['sixes', '6s'])), out: !!dis && !NOT_OUT.test(dis) }
       }),
       bowling: bowls.map((b) => ({ id: String(pick(b, ID)), name: String(pick(b, NAME) ?? ''), overs: num(pick(b, ['overs', 'o'])),
         maidens: num(pick(b, ['maidens', 'm'])), runs: num(pick(b, ['runs', 'r'])), wickets: num(pick(b, ['wickets', 'w'])) })),
@@ -376,7 +383,7 @@ export function inningsFromJson(html: string): CbInnings[] {
         batting: bats.map((b) => {
           const dis = String(pick(b, ['outDesc', 'outdec', 'outDec', 'dismissal']) ?? '')
           return { id: String(pick(b, ID)), name: String(pick(b, NAME) ?? ''), dismissal: dis, r: num(pick(b, ['runs'])), b: num(pick(b, ['balls'])),
-            fours: num(pick(b, ['fours'])), sixes: num(pick(b, ['sixes'])), out: !!dis && !/not out|batting/i.test(dis) }
+            fours: num(pick(b, ['fours'])), sixes: num(pick(b, ['sixes'])), out: !!dis && !NOT_OUT.test(dis) }
         }),
         bowling: bowls.map((b) => ({ id: String(pick(b, ID)), name: String(pick(b, NAME) ?? ''), overs: num(pick(b, ['overs'])), maidens: num(pick(b, ['maidens'])), runs: num(pick(b, ['runs'])), wickets: num(pick(b, ['wickets'])) })),
         dnb: [],
@@ -418,22 +425,25 @@ export function squadsFromJson(html: string): CbTeam[] {
   }
   // team names by team id, from any team-details object on the page
   const teamNames = new Map<string, string>()
-  for (const t of objectsAt(jt, /(?=\{"teamId"\s*:\s*\d+\s*,\s*"teamName")/, 40) as J[]) if (t?.teamId && t.teamName) teamNames.set(String(t.teamId), String(t.teamName))
+  const teamName = (t: J) => pick(t, ['teamName']) ?? nameFromTeamUrl(t?.profileUrl) ?? pick(t, ['teamSName', 'shortName'])
+  for (const t of objectsAt(jt, /(?=\{"teamId"\s*:\s*\d+\s*,)/, 80) as J[]) if (t?.teamId && !('role' in t) && teamName(t)) teamNames.set(String(t.teamId), String(teamName(t)))
   for (const root of objectsAt(jt, /(?=\{"(?:team1|teamDetails|team|squads?|players?|player|matchSquads)"\s*:)/, 60) as J[]) {
-    for (const n of walk(root)) if (n.o?.teamId && n.o?.teamName && !('role' in n.o)) teamNames.set(String(n.o.teamId), String(n.o.teamName))
+    for (const n of walk(root)) if (n.o?.teamId && !('role' in n.o) && teamName(n.o) && !teamNames.has(String(n.o.teamId))) teamNames.set(String(n.o.teamId), String(teamName(n.o)))
   }
   for (const root of objectsAt(jt, /(?=\{"(?:team1|teamDetails|team|squads?|players?|player|matchSquads)"\s*:)/, 60) as J[]) {
     for (const n of walk(root)) {
       const o = n.o
       if (pick(o, ['id', 'playerId']) === undefined || !pick(o, ['name', 'fullName']) || !('role' in o || 'captain' in o || 'keeper' in o || 'isCaptain' in o)) continue
       // team: a field on the player, else the nearest team object above it in the path (team1 / team2 …)
-      let team = String(pick(o, ['teamName']) ?? (o.teamId !== undefined ? teamNames.get(String(o.teamId)) ?? '' : ''))
+      let team = String(pick(o, ['teamName']) ?? (real(o.teamId) ? teamNames.get(String(o.teamId)) ?? `team-${o.teamId}` : ''))
       if (!team) { const t = n.path.find((k) => /^team[12]$|^team$/i.test(k)); team = t ?? 'team' }
       const t = teams.get(team) ?? { name: team, players: [] }
       const id = String(pick(o, ['id', 'playerId']))
       if (t.players.some((p) => p.id === id)) continue
       let group = groupOf(n.path)
       if (group === 'squad' && o.substitute === true) group = 'bench'
+      // impact player / concussion sub brought in during the match: they play, so they count as playing
+      if (/^in$/i.test(String(o.inMatchChange ?? o.playingXIChange ?? '').trim())) group = 'playing'
       const keeper = !!(o.keeper ?? o.isKeeper)
       t.players.push({ id, name: String(pick(o, ['fullName', 'name'])), captain: !!(o.captain ?? o.isCaptain), keeper, role: keeper ? 'WK' : roleCode(o.role), group })
       teams.set(team, t)

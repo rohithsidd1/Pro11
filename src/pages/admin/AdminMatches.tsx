@@ -8,30 +8,31 @@ import { TeamBadge } from '../../components/TeamBadge'
 import { callFunction, errorText } from '../../lib/api'
 import { shortTeam } from '../../lib/cricket'
 import { istDayName, istTime } from '../../lib/ist'
+import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
 import type { Category, DataSettings, Match, Visibility } from '../../lib/types'
-import { useDataStatus } from '../../lib/useDataSettings'
 import { filterMatches, useMatchFeed } from '../../lib/useMatches'
+import { SkRows } from '../../components/Skeleton'
 
 const CAT: Record<Category, string> = { international: 'International', league: 'League', domestic: 'Domestic', other: 'Other' }
 
 function autoShown(m: Match, s: DataSettings | null): boolean {
   if (!s) return true
-  if (m.category === 'international') return m.is_women ? s.show_women_intl : s.show_men_intl
+  if (m.is_women && !s.show_women_intl) return false      // same rule as the members' list: no women's cricket
+  if (m.category === 'international') return s.show_men_intl
   if (m.category === 'league') return s.show_leagues
   return s.show_domestic
 }
 
 export function AdminMatches() {
+  const settings = useAuth().settings as unknown as DataSettings | null
   const [reportKey, setReportKey] = useState(0)
   const toast = useToast()
-  const { matches, reload } = useMatchFeed('matches')
-  const { settings, used, reload: reloadStatus } = useDataStatus()
+  const { matches, loading, reload } = useMatchFeed('matches')
   const [tab, setTab] = useState<'Today' | 'Tomorrow' | 'Later' | 'Live'>('Today')
   const [busy, setBusy] = useState(false)
-  const cbOnly = ((settings as unknown as { data_source?: string })?.data_source ?? 'cricbuzz') === 'cricbuzz'
-  const list = filterMatches(cbOnly ? matches.filter((m) => m.id.startsWith('cb-')) : matches, tab, 'All', undefined, { liveAll: true })
+  const list = filterMatches(matches.filter((m) => m.id.startsWith('cb-')), tab, 'All', undefined, { liveAll: true })
   const [blocked, setBlocked] = useState<Set<string>>(new Set())
   useEffect(() => { void supabase.from('blocked_series').select('series_id').then(({ data }) => setBlocked(new Set((data ?? []).map((r: { series_id: string }) => r.series_id)))) }, [])
 
@@ -45,25 +46,22 @@ export function AdminMatches() {
   const refresh = async () => {
     setBusy(true)
     try {
-      const res = await callFunction<{ result: { saved: number } }>('sync-cricket', { mode: 'list' })
-      toast(`${res.result.saved} matches updated. The list above shows what members see and why.`)
-      void reload(); void reloadStatus(); setReportKey((k) => k + 1)
+      const res = await callFunction<{ result: { message?: string } }>('sync-cricket', { mode: 'sync-now' })
+      toast(res.result.message ?? 'Updated from Cricbuzz.')
+      void reload(); setReportKey((k) => k + 1)
     } catch (e) { toast(e instanceof Error ? e.message : 'Couldn’t refresh') } finally { setBusy(false) }
   }
 
   return (
-    <Shell title="Matches" kicker="What members see, and why"
+    <Shell title="Matches" back="/admin" kicker="What members see, and why"
       actions={<button className="btn sm primary" onClick={refresh} disabled={busy}>{busy ? <span className="spinner" /> : <Icon name="refresh" small />}<span>Refresh now</span></button>}>
       <MatchReport key={reportKey} />
-      {!cbOnly && <p className="help" style={{ marginBottom: 14 }}>
-        Credits used today: <b className="num">{used}</b> of <span className="num">{settings?.daily_credit_cap ?? 90}</span>. A refresh costs 1 credit per 25 matches.
-        {' '}<Link to="/admin/data" className="textlink" style={{ minHeight: 0, fontSize: 12.5 }}>Cricket data settings</Link>
-      </p>}
       <div className="seg" style={{ maxWidth: 520 }}>
         {(['Today', 'Tomorrow', 'Later', 'Live'] as const).map((t) => <button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}>{t}</button>)}
       </div>
 
-      {list.length === 0 && <Empty icon="stumps" title="No matches here">Tap Refresh now, or wait for the next automatic refresh.</Empty>}
+      {loading && <SkRows n={6} avatar={false} />}
+      {!loading && list.length === 0 && <Empty icon="stumps" title="No matches here">Tap Refresh now, or wait for the next automatic refresh.</Empty>}
       <div className="list" style={{ marginTop: 16 }}>
         {list.map((m) => {
           const shown = m.visibility === 'shown' || (m.visibility === 'auto' && autoShown(m, settings))

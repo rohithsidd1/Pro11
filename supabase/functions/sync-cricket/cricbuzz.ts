@@ -1,7 +1,7 @@
 // Pro11 · Cricbuzz data source (unofficial, free). Called every 5 minutes; each step only runs when due.
 // The Netlify function "cricbuzz" fetches and reads the pages; this file decides what to fetch and stores it.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
-import { categorize, groupByFields } from '../_shared/cricket.ts'
+import { categorize, groupByFields } from '../_shared/match.ts'
 
 // deno-lint-ignore no-explicit-any
 type Any = any
@@ -120,11 +120,14 @@ async function cbSchedule(ctx: CbCtx) {
 }
 
 // ---------------- one match: time, toss, squads, Playing XI ----------------
-function teamOf(scTeam: string, m: Any): string {
+function teamOf(scTeam: string, m: Any, order?: string[]): string {
   const n = norm(scTeam)
   for (const t of [m.team_a, m.team_b]) if (norm(t) === n) return t
   for (const t of [m.team_a, m.team_b]) if (n && (norm(t).includes(n) || n.includes(norm(t)))) return t
   for (const [t, sh] of [[m.team_a, m.team_a_short], [m.team_b, m.team_b_short]]) if (sh && n.startsWith(norm(sh))) return t
+  // last resort: Cricbuzz lists the match's teams in order (team 1, team 2)
+  const i = order?.indexOf(scTeam) ?? -1
+  if (i === 0 || i === 1) return i === 0 ? m.team_a : m.team_b
   return scTeam
 }
 
@@ -146,7 +149,8 @@ async function applyInfo(ctx: CbCtx, matchId: string, sc: Any): Promise<{ player
 
   // squads (with roles from the cache; unknown roles are learned by cbRoles)
   const teams: Any[] = Array.isArray(sc.teams) ? sc.teams : []
-  const all = teams.flatMap((t) => t.players.map((p: Any) => ({ ...p, team: teamOf(t.name, m) })))
+  const order = teams.map((t) => t.name)
+  const all = teams.flatMap((t) => t.players.map((p: Any) => ({ ...p, team: teamOf(t.name, m, order) })))
   if (!all.length) return { players: 0, xi: false }
   const { data: cache } = await ctx.db.from('cb_players').select('profile_id, role').in('profile_id', all.map((p) => p.id))
   const roles = new Map((cache ?? []).filter((c: Any) => c.role).map((c: Any) => [c.profile_id, c.role]))

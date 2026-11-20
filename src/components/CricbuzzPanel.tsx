@@ -18,8 +18,7 @@ const REPORT = `${window.location.origin}/.netlify/functions/cricbuzz?debug=1`
 export function CricbuzzPanel() {
   const { settings, refresh } = useAuth()
   const toast = useToast()
-  const s = (settings ?? {}) as unknown as { data_source?: string; cb_health?: Health; last_cb_list_at?: string; last_cb_schedule_at?: string }
-  const source = s.data_source ?? 'cricbuzz'
+  const s = (settings ?? {}) as unknown as { cb_health?: Health; last_cb_list_at?: string; last_cb_schedule_at?: string }
   const health = s.cb_health ?? {}
   const [busy, setBusy] = useState<string | null>(null)
   const timing = useSettingsForm<{ cb_list_minutes: number; cb_live_minutes: number; cb_schedule_hours: number }>(['cb_list_minutes', 'cb_live_minutes', 'cb_schedule_hours'])
@@ -39,7 +38,7 @@ export function CricbuzzPanel() {
       <div className="ch"><h3>Cricbuzz</h3>{Object.keys(health).length ? <span className={allOk ? 'tag ok' : 'tag bad'}><span className="tx">{allOk ? 'Working' : 'Needs attention'}</span></span> : null}</div>
       <p className="help">Pro11 reads Cricbuzz by itself: live joined matches every minute, everything else every 5 minutes. Squads, roles and the Playing XI come straight from Cricbuzz.</p>
       <button className="btn primary" style={{ marginTop: 12 }} disabled={!!busy} onClick={syncNow}>{busy ? <span className="spinner" /> : <Icon name="refresh" small />}<span>Sync now</span></button>
-      <p className="help" style={{ marginTop: 6 }}>Last update: {s.last_cb_list_at ? `${istDayName(s.last_cb_list_at)} ${istTime(s.last_cb_list_at)}` : 'not yet'}{source !== 'cricbuzz' ? ' · Data source is set to CricketData' : ''}</p>
+      <p className="help" style={{ marginTop: 6 }}>Last update: {s.last_cb_list_at ? `${istDayName(s.last_cb_list_at)} ${istTime(s.last_cb_list_at)}` : 'not yet'}</p>
       <div className="tscroll" style={{ marginTop: 12 }}>
         <table className="wtable">
           <thead><tr><th scope="col">Part</th><th scope="col">Last run</th><th scope="col" className="r">Found</th><th scope="col">Health</th></tr></thead>

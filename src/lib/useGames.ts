@@ -14,8 +14,15 @@ export function useContest(matchId: string, game: GameKind) {
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const { data: c, error: e1 } = await supabase.rpc('ensure_contest', { p_match: matchId, p_game: game })
-    if (e1 || !c) { setError('Couldn’t load this game.'); setLoading(false); return }
+    // read the game; only ask the server to set it up if it doesn't exist yet and the match does
+    let { data: c } = await supabase.from('contests').select('*').eq('match_id', matchId).eq('game', game).maybeSingle()
+    if (!c) {
+      const { data: m } = await supabase.from('matches').select('id').eq('id', matchId).maybeSingle()
+      if (!m) { setError('This match no longer exists.'); setLoading(false); return }
+      const made = await supabase.rpc('ensure_contest', { p_match: matchId, p_game: game })
+      if (made.error || !made.data) { setError('Couldn’t load this game.'); setLoading(false); return }
+      c = made.data
+    }
     const ct = c as Contest
     const [en, pk] = await Promise.all([
       supabase.from('entries').select('*, who:profiles!entries_user_id_fkey(name, color)').eq('contest_id', ct.id).order('created_at'),

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import { Avatar } from '../../components/Avatar'
 import { Empty } from '../../components/Empty'
 import { Icon } from '../../components/Icon'
@@ -10,12 +10,15 @@ import { istTime } from '../../lib/ist'
 import { rupees } from '../../lib/money'
 import type { MatchPlayer } from '../../lib/types'
 import { sortPlayers, useContest, useMatchAndSquad } from '../../lib/useGames'
+import { SkScreen } from '../../components/Skeleton'
+import { ResultBanner, useContestNets } from '../../components/ResultBanner'
 
 export function XiResults() {
   const { id = '' } = useParams()
   const { profile } = useAuth()
   const { match, players, loading: l1 } = useMatchAndSquad(id)
   const { contest, entries, picks, mine, loading: l2 } = useContest(id, 'xi')
+  const nets = useContestNets(contest)
   const [who, setWho] = useState<string | null>(null)
   const [team, setTeam] = useState<string | null>(null)
 
@@ -25,8 +28,8 @@ export function XiResults() {
     return teams.size === 2 && [...teams.values()].every((n) => n === 11)
   }, [players])
 
-  if (l1 || l2) return <Shell title="Results" back={`/match/${id}`}><p className="help">Loading…</p></Shell>
-  if (!match || !contest) return <Shell title="Results" back="/"><Empty icon="trophy" title="Game not found" /></Shell>
+  if (l1 || l2) return <Shell title="Results" back={`/match/${id}`}><SkScreen rows={5} /></Shell>
+  if (!match || !contest) return <Shell title="Results" back="/"><Empty icon="stumps" title="This game isn’t available" action={<Link className="btn" to="/"><span>Back to matches</span></Link>}>The match may have been removed from the list, or the game wasn’t run.</Empty></Shell>
   if (contest.status === 'open') return <Navigate to={mine ? `/match/${id}/xi` : `/match/${id}`} replace />
 
   const ranked = [...entries].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99) || b.points - a.points)
@@ -69,7 +72,7 @@ export function XiResults() {
             ) : (
               <div className="score-hero">
                 <p style={{ fontFamily: 'var(--display)', fontSize: 20, fontWeight: 700 }}>
-                  {mine ? (mine.rank === 1 ? (final ? 'You won' : 'You’re 1st') : `You’re ${ordinal(mine.rank ?? 0)}`) : `${leader?.who?.name ?? ''} leads`}
+                  {mine ? (!mine.rank ? (final ? 'Final' : 'Your score') : mine.rank === 1 ? (final ? 'You won' : 'You’re 1st') : `You’re ${ordinal(mine.rank)}`) : `${leader?.who?.name ?? ''} leads`}
                 </p>
                 <p className="big">{mine ? mine.correct : leader?.correct ?? 0}<span style={{ fontSize: 22, fontWeight: 500 }}>/22</span></p>
                 <p style={{ fontSize: 13, fontWeight: 500 }}>
@@ -83,6 +86,7 @@ export function XiResults() {
               <div><p className="k">Players</p><p className="v">{entries.length}</p></div>
               <div><p className="k">Status</p><p className="v" style={{ fontSize: 15, fontFamily: 'var(--text)', fontWeight: 700 }}>{final ? 'Final' : contest.status === 'scored' ? 'Provisional' : 'Locked'}</p></div>
             </div>
+            <ResultBanner contest={contest} myNet={mine ? nets[mine.user_id] : undefined} joined={!!mine} />
           </section>
 
           <div className="sec"><h2>Standings</h2><span className="aside">{contestRule(contest.fee, final)}</span></div>
@@ -93,13 +97,13 @@ export function XiResults() {
                 <Avatar name={e.who?.name ?? '?'} color={e.who?.color ?? '#C7B6F7'} />
                 <span style={{ minWidth: 0 }}>
                   <span className="rt">{e.user_id === profile?.id ? 'You' : e.who?.name}</span>
-                  <span className="rs">{contest.status === 'locked' ? `${picks.filter((p) => p.entry_id === e.id).length} picks` : `${e.correct} of 22 right`}{e.payout > 0 && <>, won <span className="num">{rupees(e.payout)}</span></>}</span>
+                  <span className="rs">{contest.status === 'locked' ? `${picks.filter((p) => p.entry_id === e.id).length} picks` : `${e.correct} of 22 right`}{nets[e.user_id] && Math.abs(nets[e.user_id].net) > 0.004 && <>, <span className={`num ${nets[e.user_id].net > 0 ? 'owe-pos' : 'owe-neg'}`}>{rupees(nets[e.user_id].net, { sign: true })}</span></>}</span>
                 </span>
                 <span className="pts">{contest.status === 'locked' ? '' : e.points}</span>
               </button>
             ))}
           </div>
-          <p className="fine" style={{ paddingLeft: 0 }}>{final ? 'Final. Winnings are in the winners’ wallets.' : 'Provisional until the admin finishes the game and pays out.'} Tap anyone to see their picks.</p>
+          <p className="fine" style={{ paddingLeft: 0 }}>{final ? 'Final. Who owes whom is in Ledger.' : 'Provisional: final 30 minutes after the last scores.'} Tap anyone to see their picks.</p>
         </div>
 
         <div>
@@ -133,5 +137,5 @@ function ordinal(n: number) {
   return n + (s[(v - 20) % 10] || s[v] || s[0])
 }
 function contestRule(fee: number, final: boolean) {
-  return fee > 0 ? (final ? 'Paid out' : 'Winner takes all') : 'Just for fun'
+  return fee > 0 ? (final ? 'Final' : `Losers owe the winner ₹${fee} each`) : 'Just for fun'
 }

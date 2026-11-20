@@ -67,7 +67,7 @@ export function Profile() {
             </div>
           </div>
           <div className="field">
-            <label htmlFor="me-upi">UPI ID for withdrawals</label>
+            <label htmlFor="me-upi">Your UPI ID (so others can pay you)</label>
             <div className="input"><input id="me-upi" value={upi} onChange={(e) => setUpi(e.target.value)} placeholder="name@okaxis" autoComplete="off" /></div>
             <p className="help">Your phone number can only be changed by the admin.</p>
           </div>
@@ -90,7 +90,7 @@ export function Profile() {
         </Link>
         <Link to="/notifications" className="row">
           <span className="ic" style={{ ['--b' as string]: 'var(--soft)' }}><Icon name="bell" /></span>
-          <span><span className="rt">Notifications</span><span className="rs">Payments, withdrawals and results</span></span>
+          <span><span className="rt">Notifications</span><span className="rs">Results, settling up and alerts</span></span>
           <Icon name="chev" />
         </Link>
         <Link to="/help" className="row">

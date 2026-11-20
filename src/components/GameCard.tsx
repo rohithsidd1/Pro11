@@ -9,9 +9,10 @@ import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import type { GameKind, Match } from '../lib/types'
 import { contestSummary, useContest } from '../lib/useGames'
-import { useWallet } from '../lib/useWallet'
 import { Avatar } from './Avatar'
 import { Icon } from './Icon'
+import { MyEntry } from './MyEntry'
+import { Sk } from './Skeleton'
 
 const GAME: Record<GameKind, { n: number; color: string; title: string; desc: string; path: string }> = {
   xi: { n: 1, color: 'var(--blue)', title: 'Predict the Playing XI', path: 'xi',
@@ -20,14 +21,13 @@ const GAME: Record<GameKind, { n: number; color: string; title: string; desc: st
     desc: 'Pick 11 players, a captain (2×) and a vice-captain (1.5×). Points come in during and after the match.' },
 }
 
-const ordinal = (n: number) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]) }
 
 export function GameCard({ match, game }: { match: Match; game: GameKind }) {
   const { settings } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
   const { contest, entries, mine, myPicks, myTeam, loading, reload } = useContest(match.id, game)
-  const { balance } = useWallet()
+  const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [squadsOut, setSquadsOut] = useState<boolean | null>(null)
   useEffect(() => {
@@ -36,14 +36,11 @@ export function GameCard({ match, game }: { match: Match; game: GameKind }) {
   }, [match.id, match.has_squad, match.squad_fetched_at])
   const g = GAME[game]
   const minPlayers = (settings as unknown as { min_players?: number })?.min_players ?? 2
-  if (loading || !contest) return <li className="card game" style={{ ['--c' as string]: g.color }}><p className="help">Loading…</p></li>
+  if (loading || !contest) return <li className="card game" style={{ ['--c' as string]: g.color }}><Sk w="40%" h={22} /><Sk w="85%" h={13} style={{ marginTop: 12 }} /><Sk w="100%" h={56} r={14} style={{ marginTop: 14 }} /></li>
   if (!contest.enabled) return null
 
   const { pot, line } = contestSummary(contest, entries.length, minPlayers)
   const open = contest.status === 'open' && new Date(contest.lock_at).getTime() > Date.now()
-  const short = Math.max(0, contest.fee - balance)
-  const progress = game === 'xi' ? `${myPicks.length}/22 picked` : myTeam.length === 11 ? 'team ready' : 'no team yet'
-  const ready = game === 'xi' ? myPicks.length > 0 : myTeam.length === 11
 
   const join = async () => {
     setBusy(true)
@@ -51,23 +48,17 @@ export function GameCard({ match, game }: { match: Match; game: GameKind }) {
     if (error) { setBusy(false); return toast(errorText(error)) }
     if (canAutoLoadSquad(match)) { try { await callFunction('sync-cricket', { mode: 'squad-for-entry', matchId: match.id }) } catch { /* the pick screen keeps checking */ } }
     setBusy(false)
-    toast(`You’re in. ${rupees(contest.fee)} taken from your wallet.`)
+    toast(`You’re in. Now pick your ${game === 'xi' ? 'Playing XIs' : 'team'}.`)
     navigate(`/match/${match.id}/${g.path}`)
   }
   const leave = async () => {
-    if (!window.confirm(`Leave this game? ${rupees(contest.fee)} goes back to your wallet.`)) return
+    if (!window.confirm('Leave this game? Your picks will be removed.')) return
     const { error } = await supabase.rpc('leave_contest', { p_contest: contest.id })
     if (error) return toast(errorText(error))
-    toast('You left. Your entry is back in your wallet.'); void reload()
+    toast('You left the game.'); void reload()
   }
 
-  const lockedLine = (() => {
-    if (!mine) return line
-    if (contest.status === 'paid') return mine.payout > 0 ? `You won ${rupees(mine.payout)}` : `Final: you were ${ordinal(mine.rank ?? 0)}`
-    if (contest.status === 'scored') return `You’re ${ordinal(mine.rank ?? 0)} with ${Number(mine.points)} points. Pays out soon.`
-    if (game === 'fantasy' && contest.live_at) return `Live: you’re ${ordinal(mine.rank ?? 0)} with ${Number(mine.points)} points`
-    return game === 'xi' ? 'Locked. Waiting for the Playing XI.' : 'Locked. Points come in during the match.'
-  })()
+  const lockedLine = line   // joined games are shown by "Your entry"
 
   return (
     <li className="card game" style={{ ['--c' as string]: g.color }}>
@@ -91,27 +82,28 @@ export function GameCard({ match, game }: { match: Match; game: GameKind }) {
       {open && !mine && squadsOut !== false && (
         <>
           <p className="needs">{line}</p>
-          {short > 0
-            ? <Link className="btn primary block" style={{ marginTop: 12 }} to={`/wallet/add?amount=${Math.max(short, 10)}`}><Icon name="down" /><span>Add {rupees(short)} to join</span></Link>
-            : <button className="btn primary block" style={{ marginTop: 12 }} disabled={busy} onClick={join}>{busy ? <span className="spinner" /> : <span>Join for <span className="num">{rupees(contest.fee)}</span></span>}</button>}
+          {confirming ? (
+            <div className="panel" style={{ marginTop: 12, background: 'var(--paper)' }}>
+              <p className="rt">Join for {rupees(contest.fee)}?</p>
+              <p className="rs">No money moves now. If you lose, you owe the winner {rupees(contest.fee)}; if you win, everyone else owes you. Settle up in Ledger after the match.</p>
+              <div className="btn-row" style={{ marginTop: 10 }}>
+                <button className="btn sm" onClick={() => setConfirming(false)}><span>Cancel</span></button>
+                <button className="btn sm primary" disabled={busy} onClick={join}>{busy ? <span className="spinner" /> : <span>Join</span>}</button>
+              </div>
+            </div>
+          ) : <button className="btn primary block" style={{ marginTop: 12 }} onClick={() => setConfirming(true)}><span>Join for <span className="num">{rupees(contest.fee)}</span></span></button>}
         </>
       )}
-      {open && mine && (
-        <div className="game-foot">
-          <span className="in-pill"><Icon name="check" />You’re in, {progress}</span>
-          <span style={{ display: 'flex', gap: 8 }}>
-            <button className="btn sm" onClick={leave}><span>Leave</span></button>
-            <Link className="btn sm primary" to={`/match/${match.id}/${g.path}`}><Icon name="edit" small /><span>{ready ? 'Edit' : game === 'xi' ? 'Pick now' : 'Pick team'}</span></Link>
-          </span>
-        </div>
+      {mine && contest.status !== 'cancelled' && (
+        <MyEntry match={match} game={game} contest={contest} mine={mine} entries={entries} myPicks={myPicks} myTeam={myTeam} path={g.path} onLeave={leave} />
       )}
-      {!open && contest.status !== 'cancelled' && (
+      {!mine && !open && contest.status !== 'cancelled' && (
         <div className="game-foot">
           <span className="help" style={{ color: 'var(--ink)', fontWeight: 600 }}>{lockedLine}</span>
           {entries.length > 0 && <Link className="btn sm" to={`/match/${match.id}/${g.path}/results`}><Icon name="trophy" small /><span>{contest.status === 'locked' && !contest.live_at ? 'See teams' : 'Results'}</span></Link>}
         </div>
       )}
-      {contest.status === 'cancelled' && <p className="needs">{line}{mine ? '. Your entry was refunded.' : ''}</p>}
+      {contest.status === 'cancelled' && <p className="needs">{line}{mine ? '. Nobody owes anything for it.' : ''}</p>}
     </li>
   )
 }

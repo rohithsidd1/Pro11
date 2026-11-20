@@ -11,9 +11,12 @@ import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
 import type { MatchPlayer } from '../../lib/types'
 import { ROLE_LABEL, ROLE_ORDER, ROLE_PLURAL, useContest, useMatchAndSquad } from '../../lib/useGames'
+import { SkScreen } from '../../components/Skeleton'
+import { SavedSheet } from '../../components/SavedSheet'
 
 export function PickXi() {
   const { id = '' } = useParams()
+  const [saved, setSaved] = useState<{ title: string; detail: string } | null>(null)
   const toast = useToast()
   const { match, players, loading: l1, reload: reloadSquad } = useMatchAndSquad(id)
   const { contest, mine, myPicks, loading: l2, reload } = useContest(id, 'xi')
@@ -39,8 +42,8 @@ export function PickXi() {
     return m
   }, [players])
 
-  if (l1 || l2) return <Shell title="Predict the XI" back={`/match/${id}`}><p className="help">Loading…</p></Shell>
-  if (!match || !contest) return <Shell title="Predict the XI" back="/"><Empty icon="stumps" title="Game not found" /></Shell>
+  if (l1 || l2) return <Shell title="Predict the XI" back={`/match/${id}`}><SkScreen hero={false} rows={8} /></Shell>
+  if (!match || !contest) return <Shell title="Predict the XI" back="/"><Empty icon="stumps" title="This game isn’t available" action={<Link className="btn" to="/"><span>Back to matches</span></Link>}>The match may have been removed from the list, or the game wasn’t run.</Empty></Shell>
   if (!mine) return <Navigate to={`/match/${id}`} replace />
 
   const teams = [match.team_a, match.team_b]
@@ -67,7 +70,7 @@ export function PickXi() {
     setBusy(null)
     if (error) return toast(errorText(error))
     setDirty(false); await reload()
-    toast(total === 22 ? 'All 22 saved. Good luck!' : `Saved ${total} of 22. You can change them until ${istTime(contest.lock_at)}.`)
+    setSaved(total === 22 ? { title: 'Picks saved', detail: 'All 22 picked: 11 for each team. Good luck!' } : { title: `${total} of 22 saved`, detail: 'Pick the rest before the toss to score for every player.' })
   }
 
   return (
@@ -75,8 +78,8 @@ export function PickXi() {
       actions={!open ? <Link className="btn sm" to={`/match/${id}/xi/results`}><Icon name="trophy" small /><span>Results</span></Link> : undefined}>
       <div className="pick-wrap">
       {players.length === 0 ? (
-        <Empty icon="user" title="Loading squads from CricketData…">
-          This happens automatically and usually takes under a minute. If CricketData has no squad for this league, the game is cancelled and your entry comes back.
+        <Empty icon="user" title="Loading squads from Cricbuzz…">
+          This happens by itself as soon as Cricbuzz publishes the squads. You can pick once they’re in.
         </Empty>
       ) : (
         <>
@@ -126,6 +129,7 @@ export function PickXi() {
         </>
       )}
       </div>
+      {saved && <SavedSheet matchId={id} game="xi" title={saved.title} detail={saved.detail} lockAt={contest.lock_at} onClose={() => setSaved(null)} />}
     </Shell>
   )
 }

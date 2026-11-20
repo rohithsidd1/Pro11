@@ -5,8 +5,9 @@ import { TeamBadge } from '../components/TeamBadge'
 import { scoreFor, scoreText, shortTeam } from '../lib/cricket'
 import { useMatchAndSquad, usePlayerPoints } from '../lib/useGames'
 import { useState } from 'react'
+import { SkScreen } from '../components/Skeleton'
 
-// deno-style loose shape of CricketData's scorecard (only read, never trusted for money)
+// loose shape of the stored Cricbuzz scorecard (only read, never trusted for money)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Inn = any
 
@@ -15,7 +16,7 @@ export function Scorecard() {
   const { match, players, loading } = useMatchAndSquad(id)
   const points = usePlayerPoints(id)
   const [inn, setInn] = useState(0)
-  if (loading) return <Shell title="Scorecard" back={`/match/${id}`}><p className="help">Loading…</p></Shell>
+  if (loading) return <Shell title="Scorecard" back={`/match/${id}`}><SkScreen rows={6} /></Shell>
   if (!match) return <Shell title="Scorecard" back="/"><Empty icon="stumps" title="Match not found" /></Shell>
   const card = (match as unknown as { scorecard?: Inn[] | null }).scorecard ?? null
   const names = new Map(players.map((p) => [p.player_id, p]))

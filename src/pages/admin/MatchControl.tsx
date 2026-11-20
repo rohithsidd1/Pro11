@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Avatar } from '../../components/Avatar'
+import { Empty } from '../../components/Empty'
 import { Icon } from '../../components/Icon'
 import { Shell } from '../../components/Shell'
 import { TeamBadge } from '../../components/TeamBadge'
@@ -12,14 +13,16 @@ import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
 import type { GameKind, Match, MatchPlayer } from '../../lib/types'
 import { useContest, useMatchAndSquad } from '../../lib/useGames'
+import { SkPanel, SkScreen } from '../../components/Skeleton'
 
 const REASONS = ['Match abandoned', 'No result', 'Something went wrong']
 
-/** Everything here happens on its own. This screen shows where each game is; Cancel and refund is the only emergency button. */
+/** Everything here happens on its own. This screen shows where each game is; Cancel is the only emergency button. */
 export function MatchControl() {
   const { id = '' } = useParams()
-  const { match, players } = useMatchAndSquad(id)
-  if (!match) return <Shell title="Game status" back="/admin/matches"><p className="help">Loading…</p></Shell>
+  const { match, players, loading } = useMatchAndSquad(id)
+  if (!match && loading) return <Shell title="Game status" back="/admin/matches"><SkScreen rows={4} /></Shell>
+  if (!match) return <Shell title="Game status" back="/admin/matches"><Empty icon="stumps" title="Match not found" action={<Link className="btn" to="/admin/matches"><span>All matches</span></Link>}>It may have been removed from Cricbuzz’s list.</Empty></Shell>
   const teams = [match.team_a, match.team_b]
   const xiCount = (t: string) => players.filter((p) => p.team === t && p.in_xi).length
   return (
@@ -51,7 +54,7 @@ function GamePanel({ match, players, game }: { match: Match; players: MatchPlaye
   const [cancelOpen, setCancelOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [edit, setEdit] = useState<{ fee: string; enabled: boolean; max: string } | null>(null)
-  if (!contest) return <section className="panel"><p className="help">Loading…</p></section>
+  if (!contest) return <SkPanel lines={5} />
   const editing = edit ?? { fee: String(contest.fee), enabled: contest.enabled, max: String((contest as unknown as { max_players?: number }).max_players ?? 10) }
   const saveGame = async () => {
     setBusy(true)
@@ -68,14 +71,14 @@ function GamePanel({ match, players, game }: { match: Match; players: MatchPlaye
   const scored = ['scored', 'paid'].includes(contest.status)
   const steps: { done: boolean; title: string; sub: string }[] = [
     { done: entries.length > 0, title: entries.length ? `${entries.length} joined, pot ${rupees(pot)}` : 'Waiting for players',
-      sub: `Locks ${istDayName(contest.lock_at).toLowerCase()} at ${istTime(contest.lock_at)}. Fewer than 2 by then: cancelled and refunded.` },
-    { done: players.length > 0, title: players.length ? `Squads loaded, ${players.length} players` : match.squad_attempted_at ? 'Loading squads…' : 'Squads load when the first person joins',
-      sub: 'From CricketData. No squad for the league: it’s removed and games are refunded.' },
+      sub: `Locks ${istDayName(contest.lock_at).toLowerCase()} at ${istTime(contest.lock_at)}. Fewer than 2 by then: cancelled.` },
+    { done: players.length > 0, title: players.length ? `Squads loaded, ${players.length} players` : 'Squads load when the first person joins',
+      sub: 'From Cricbuzz, as soon as it publishes them.' },
     ...(game === 'xi'
-      ? [{ done: xiDone, title: xiDone ? 'Playing XI in, game scored' : 'Playing XI', sub: 'From CricketData after the toss, or from the final points. Neither: refunded.' }]
+      ? [{ done: xiDone, title: xiDone ? 'Playing XI in, game scored' : 'Playing XI', sub: 'From Cricbuzz at the toss, or from the final scorecard. Neither: refunded.' }]
       : [
           { done: Boolean(contest.live_at), title: contest.live_at ? `Live points at ${istTime(contest.live_at)}` : 'Live points around the innings break', sub: 'One update during the match (if on in Game rules).' },
-          { done: scored, title: scored ? 'Final points in' : 'Final points when the match ends', sub: 'Abandoned or no result: refunded.' },
+          { done: scored, title: scored ? 'Final points in' : 'Final points when the match ends', sub: 'Abandoned or no result: cancelled, nobody owes anything.' },
         ]),
     { done: contest.status === 'paid', title: contest.status === 'paid' ? 'Paid out' : payAt ? `Pays out at ${istTime(payAt)}` : 'Pays out 30 minutes after final scoring', sub: 'Winner takes the pot; ties split equally.' },
   ]
@@ -84,14 +87,14 @@ function GamePanel({ match, players, game }: { match: Match; players: MatchPlaye
     const { error } = await supabase.rpc('admin_cancel_contest', { p_contest: contest.id, p_reason: reason })
     setBusy(false)
     if (error) return toast(errorText(error))
-    toast('Cancelled and refunded'); setCancelOpen(false); void reload()
+    toast('Cancelled. Nobody owes anything for it.'); setCancelOpen(false); void reload()
   }
 
   return (
     <section className="panel">
       <div className="ch"><h3>{game === 'xi' ? 'Predict the XI' : 'Fantasy XI'}</h3>{contest.status === 'cancelled' && <span className="tag"><span className="tx">Cancelled</span></span>}</div>
       {contest.status === 'cancelled'
-        ? <p className="help">{contest.cancel_reason}. Everyone was refunded.</p>
+        ? <p className="help">{contest.cancel_reason}. Nobody owes anything for it.</p>
         : (
           <div className="checks">
             {steps.map((st) => (
@@ -141,10 +144,10 @@ function GamePanel({ match, players, game }: { match: Match; players: MatchPlaye
             </div>
             <div className="btn-row" style={{ marginTop: 12 }}>
               <button className="btn" onClick={() => setCancelOpen(false)}><span>Back</span></button>
-              <button className="btn danger" disabled={busy} onClick={cancel}>{busy ? <span className="spinner" /> : <span>Cancel and refund <span className="num">{rupees(pot)}</span></span>}</button>
+              <button className="btn danger" disabled={busy} onClick={cancel}>{busy ? <span className="spinner" /> : <span>Cancel the game <span className="num">{rupees(pot)}</span></span>}</button>
             </div>
           </div>
-        ) : <button className="btn danger sm" style={{ marginTop: 14 }} onClick={() => setCancelOpen(true)}><Icon name="ban" small /><span>Cancel and refund</span></button>
+        ) : <button className="btn danger sm" style={{ marginTop: 14 }} onClick={() => setCancelOpen(true)}><Icon name="ban" small /><span>Cancel the game</span></button>
       )}
     </section>
   )

@@ -52,15 +52,22 @@ function finder(people: { id: string; name: string }[]) {
  * Points for every player in the match. `xiIds` are the Playing XI (both teams); `roles` (optional) avoids
  * charging ducks and strike-rate penalties to bowlers.
  */
-export function computePoints(sc: CbScorecard, rules: Rules, xiIds: string[], roles: Record<string, Role> = {}): Record<string, PlayerPoints> {
+export function computePoints(sc: CbScorecard, rules: Rules, xiIds: string[], roles: Record<string, Role> = {}, format?: string): Record<string, PlayerPoints> {
   const out: Record<string, PlayerPoints> = {}
   const get = (id: string) => (out[id] ??= { points: 0, bat: 0, bowl: 0, field: 0, xi: 0 })
   for (const id of xiIds) get(id).xi = rules.xi
+  // super overs don't count: only the real innings (2 in a T20 or ODI, up to 4 in a Test)
+  const real = format ? sc.innings.slice(0, /test/i.test(format) ? 4 : 2) : sc.innings
+  // anyone who actually batted or bowled played, even if the lineup didn't list them (e.g. an impact player)
+  for (const inn of real) {
+    for (const b of inn.batting) if (b.b > 0 || b.out) get(b.id).xi = rules.xi
+    for (const w of inn.bowling) if (w.overs > 0) get(w.id).xi = rules.xi
+  }
 
   const allPlayers = sc.teams.flatMap((t) => t.players.map((p) => ({ id: p.id, name: p.name, team: t.name })))
   const catches: Record<string, number> = {}
 
-  for (const inn of sc.innings) {
+  for (const inn of real) {
     // the fielding side is the team that isn't batting; fall back to everyone not batting in this innings
     const batIds = new Set([...inn.batting.map((b) => b.id), ...inn.dnb])
     const fielders = allPlayers.filter((p) => (inn.team ? norm(p.team) !== norm(inn.team) : true) && !batIds.has(p.id))

@@ -12,6 +12,7 @@ import { istDayName, istTime, untilText } from '../lib/ist'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import type { Match, MatchPlayer } from '../lib/types'
+import { SkScreen } from '../components/Skeleton'
 
 const ROLE_LABEL: Record<MatchPlayer['role'], string> = { WK: 'Wicketkeeper', BAT: 'Batter', AR: 'All-rounder', BOWL: 'Bowler' }
 const ROLE_ORDER: MatchPlayer['role'][] = ['BAT', 'WK', 'AR', 'BOWL']
@@ -54,7 +55,7 @@ export function MatchPage() {
     } finally { setBusy(null) }
   }
 
-  if (loading) return <Shell title="Match" back="/"><p className="help">Loading…</p></Shell>
+  if (loading) return <Shell title="Match" back="/"><SkScreen rows={3} /></Shell>
   if (!m) return <Shell title="Match" back="/"><Empty icon="stumps" title="Match not found">It may have been removed from the list.</Empty></Shell>
 
   const live = isLive(m)
@@ -109,7 +110,7 @@ export function MatchPage() {
             <GameCard match={m} game="xi" />
             <GameCard match={m} game="fantasy" />
           </ol>
-          <p className="fine">Each game needs at least 2 players by its lock. If it doesn’t fill, or CricketData doesn’t have the data, it’s cancelled and your entry goes back to your wallet.</p>
+          <p className="fine">Each game needs at least 2 players by its lock. If it doesn’t fill, or the match is abandoned, it’s cancelled and nobody owes anything.</p>
 
           {isAdmin && (
             <>
@@ -130,7 +131,7 @@ export function MatchPage() {
           {players.length === 0 ? (
             <div className="panel" style={{ background: 'var(--soft)' }}>
               <p className="rt">Squads aren’t loaded yet</p>
-              <p className="rs">They load from CricketData automatically when the first person joins a game.</p>
+              <p className="rs">They load from Cricbuzz by themselves as soon as it publishes them.</p>
             </div>
           ) : (
             teams.map((t) => {

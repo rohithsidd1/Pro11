@@ -1,10 +1,11 @@
 import { Icon } from '../../components/Icon'
 import { Shell } from '../../components/Shell'
 import { useSettingsForm } from '../../lib/useSettingsForm'
+import { SkPanel } from '../../components/Skeleton'
 
 export function Appearance() {
   const { f, set, save, busy } = useSettingsForm<{ card_style: 'notched' | 'plain' }>(['card_style'])
-  if (!f) return <Shell title="Appearance" back="/admin"><p className="help">Loading…</p></Shell>
+  if (!f) return <Shell title="Appearance" back="/admin"><SkPanel lines={3} /></Shell>
   return (
     <Shell title="Appearance" back="/admin">
       <section className="panel" style={{ maxWidth: 640 }}>

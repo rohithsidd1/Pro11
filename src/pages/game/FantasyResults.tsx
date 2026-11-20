@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import { Avatar } from '../../components/Avatar'
 import { Empty } from '../../components/Empty'
 import { Shell } from '../../components/Shell'
@@ -8,6 +8,8 @@ import { shortTeam } from '../../lib/cricket'
 import { istTime } from '../../lib/ist'
 import { rupees } from '../../lib/money'
 import { ROLE_LABEL, ROLE_ORDER, teamRules, useContest, useMatchAndSquad, usePlayerPoints } from '../../lib/useGames'
+import { SkScreen } from '../../components/Skeleton'
+import { ResultBanner, useContestNets } from '../../components/ResultBanner'
 
 const ordinal = (n: number) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]) }
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
@@ -18,12 +20,13 @@ export function FantasyResults() {
   const rules = teamRules(settings)
   const { match, players, loading: l1 } = useMatchAndSquad(id)
   const { contest, entries, team, mine, loading: l2 } = useContest(id, 'fantasy')
+  const nets = useContestNets(contest)
   const points = usePlayerPoints(id)
   const [who, setWho] = useState<string | null>(null)
   const [cmp, setCmp] = useState<string | null>(null)
 
-  if (l1 || l2) return <Shell title="Results" back={`/match/${id}`}><p className="help">Loading…</p></Shell>
-  if (!match || !contest) return <Shell title="Results" back="/"><Empty icon="trophy" title="Game not found" /></Shell>
+  if (l1 || l2) return <Shell title="Results" back={`/match/${id}`}><SkScreen rows={5} /></Shell>
+  if (!match || !contest) return <Shell title="Results" back="/"><Empty icon="stumps" title="This game isn’t available" action={<Link className="btn" to="/"><span>Back to matches</span></Link>}>The match may have been removed from the list, or the game wasn’t run.</Empty></Shell>
   if (contest.status === 'open') return <Navigate to={mine ? `/match/${id}/fantasy` : `/match/${id}`} replace />
 
   const ranked = [...entries].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99) || Number(b.points) - Number(a.points))
@@ -41,15 +44,15 @@ export function FantasyResults() {
       <div className="split-2">
         <div>
           <section className="chead" style={{ ['--c' as string]: 'var(--coral)', paddingBottom: 20 }}>
-            {!hasPoints ? (
+            {!hasPoints && contest.status === 'locked' ? (
               <div className="score-hero">
                 <p className="h1" style={{ fontSize: 26 }}>Teams are locked</p>
-                <p className="lead" style={{ color: 'var(--ink)' }}>Points arrive from CricketData during the match (around the innings break) and at the end.</p>
+                <p className="lead" style={{ color: 'var(--ink)' }}>Points update from the Cricbuzz scorecard every minute during the match and at the end.</p>
               </div>
             ) : (
               <div className="score-hero">
                 <p style={{ fontFamily: 'var(--display)', fontSize: 20, fontWeight: 700 }}>
-                  {mine ? (mine.rank === 1 ? (contest.status === 'paid' ? 'You won' : 'You’re 1st') : `You’re ${ordinal(mine.rank ?? 0)}`) : `${leader?.who?.name ?? ''} leads`}
+                  {mine ? (mine.rank === 1 ? (contest.status === 'paid' ? 'You won' : 'You’re 1st') : (mine.rank ? `You’re ${ordinal(mine.rank)}` : 'Your score')) : `${leader?.who?.name ?? ''} leads`}
                 </p>
                 <p className="big">{fmt(Number(mine ? mine.points : leader?.points ?? 0))}</p>
                 <p style={{ fontSize: 13, fontWeight: 500 }}>points{mine && leader && mine.id !== leader.id && <>, <span className="num">{fmt(Number(leader.points) - Number(mine.points))}</span> behind {leader.who?.name.split(' ')[0]}</>}</p>
@@ -59,25 +62,26 @@ export function FantasyResults() {
               <div><p className="k">Pot</p><p className="v">{rupees(contest.fee * entries.length)}</p></div>
               <div><p className="k">Players</p><p className="v">{entries.length}</p></div>
               <div><p className="k">Status</p><p className="v" style={{ fontSize: 15, fontFamily: 'var(--text)', fontWeight: 700 }}>
-                {contest.status === 'paid' ? 'Final' : contest.status === 'scored' ? 'Final, paying soon' : hasPoints ? `Live, ${istTime(lastUpdate)}` : 'Locked'}</p></div>
+                {contest.status === 'paid' ? 'Final' : contest.status === 'scored' ? 'Final soon' : hasPoints ? `Live, ${istTime(lastUpdate)}` : 'Locked'}</p></div>
             </div>
+            <ResultBanner contest={contest} myNet={mine ? nets[mine.user_id] : undefined} joined={!!mine} />
           </section>
 
-          <div className="sec"><h2>Standings</h2><span className="aside">Winner takes all</span></div>
+          <div className="sec"><h2>Standings</h2><span className="aside">{contest.status === 'paid' ? 'Final' : `Losers owe the winner ₹${contest.fee} each`}</span></div>
           <div className="list">
             {ranked.map((e) => (
               <button key={e.id} className={`rank-row${e.user_id === profile?.id ? ' me' : ''}`} aria-pressed={viewing?.id === e.id} onClick={() => setWho(e.id)}>
-                <span className="pos">{hasPoints ? e.rank : '–'}</span>
+                <span className="pos">{hasPoints || contest.status !== 'locked' ? (e.rank ?? '–') : '–'}</span>
                 <Avatar name={e.who?.name ?? '?'} color={e.who?.color ?? '#C7B6F7'} />
                 <span style={{ minWidth: 0 }}>
                   <span className="rt">{e.user_id === profile?.id ? 'You' : e.who?.name}</span>
-                  <span className="rs">{e.payout > 0 ? <>Won <span className="num">{rupees(e.payout)}</span></> : 'Tap to see the team'}</span>
+                  <span className="rs">{nets[e.user_id] && Math.abs(nets[e.user_id].net) > 0.004 ? <span className={`num ${nets[e.user_id].net > 0 ? 'owe-pos' : 'owe-neg'}`}>{rupees(nets[e.user_id].net, { sign: true })}</span> : 'Tap to see the team'}</span>
                 </span>
-                <span className="pts">{hasPoints ? fmt(Number(e.points)) : ''}</span>
+                <span className="pts">{hasPoints || contest.status !== 'locked' ? fmt(Number(e.points)) : ''}</span>
               </button>
             ))}
           </div>
-          <p className="fine" style={{ paddingLeft: 0 }}>{contest.status === 'paid' ? 'Final. Winnings are in the winners’ wallets.' : 'Points update automatically. The final points pay out 30 minutes after they arrive.'}</p>
+          <p className="fine" style={{ paddingLeft: 0 }}>{contest.status === 'paid' ? 'Final. Who owes whom is in Ledger.' : 'Points update automatically. The final points pay out 30 minutes after they arrive.'}</p>
         </div>
 
         <div>
@@ -148,7 +152,7 @@ function Compare({ mineId, otherId, setOther, entries, team, points, names, mult
   )
 }
 
-/** Where a player's points came from: batting, bowling, fielding (from CricketData's fantasy points). */
+/** Where a player's points came from: batting, bowling, fielding (from the Cricbuzz scorecard). */
 function Split({ pp }: { pp?: import('../../lib/types').PlayerPoints }) {
   if (!pp) return <span className="rs">Didn’t score yet</span>
   const parts = [['Bat', pp.bat], ['Bowl', pp.bowl], ['Field', pp.field]].filter(([, v]) => Number(v)) as [string, number][]

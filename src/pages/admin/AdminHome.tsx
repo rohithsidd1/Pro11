@@ -7,20 +7,25 @@ import { Icon } from '../../components/Icon'
 import { Shell } from '../../components/Shell'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
+import { money } from '../../lib/useLedger'
 import { useToast } from '../../lib/toast'
 import { useCodes } from '../../lib/useCodes'
-import { useDataStatus } from '../../lib/useDataSettings'
-import { useMoneyQueue } from '../../lib/useWallet'
 import type { IconName } from '../../components/Icon'
+import { SkRows } from '../../components/Skeleton'
 
 export function AdminHome() {
   const { profile } = useAuth()
   const toast = useToast()
   const { waiting, reload } = useCodes()
-  const { used, settings } = useDataStatus()
-  const money = useMoneyQueue(true)
+  const { settings } = useAuth()
+  const [owed, setOwed] = useState<number | null>(null)
+  const [waitingPay, setWaitingPay] = useState(0)
+  useEffect(() => {
+    void supabase.rpc('admin_ledger').then(({ data }) => setOwed(((data ?? []) as { amount: number }[]).reduce((n, p) => n + Number(p.amount), 0)))
+    void supabase.from('settlements').select('id', { count: 'exact', head: true }).eq('status', 'pending').then(({ count }) => setWaitingPay(count ?? 0))
+  }, [])
   const [members, setMembers] = useState(0)
-  const [needs, setNeeds] = useState<{ id: string; match_id: string; status: string; lock_at: string; matches: { team_a: string; team_b: string; label: string | null } }[]>([])
+  const [needs, setNeeds] = useState<{ id: string; match_id: string; status: string; lock_at: string; matches: { team_a: string; team_b: string; label: string | null } }[] | null>(null)
   useEffect(() => {
     void supabase.from('contests').select('id, match_id, status, lock_at, matches!inner(team_a, team_b, label)').in('status', ['locked', 'scored']).order('lock_at')
       .then(({ data }) => setNeeds((data as never) ?? []))
@@ -41,18 +46,15 @@ export function AdminHome() {
         <Link to="/admin/codes" className="tile" style={{ ['--c' as string]: 'var(--lemon)' }}>
           <span className="tile-k">Sign-in codes waiting</span><span className="tile-v">{waiting.length}</span>
         </Link>
-        <Link to="/admin/payments" className="tile" style={{ ['--c' as string]: 'var(--pink)' }}>
-          <span className="tile-k">Payments to check</span><span className="tile-v">{money.payments}</span>
+        <Link to="/admin/ledger" className="tile" style={{ ['--c' as string]: 'var(--pink)' }}>
+          <span className="tile-k">Still to settle</span><span className="tile-v">{owed === null ? '…' : money(owed)}</span>
         </Link>
-        <Link to="/admin/withdrawals" className="tile" style={{ ['--c' as string]: 'var(--blue)' }}>
-          <span className="tile-k">Withdrawals to pay</span><span className="tile-v">{money.withdrawals}</span>
+        <Link to="/admin/ledger" className="tile" style={{ ['--c' as string]: 'var(--blue)' }}>
+          <span className="tile-k">Payments waiting to be confirmed</span><span className="tile-v">{waitingPay}</span>
         </Link>
         <Link to="/admin/data" className="tile" style={{ ['--c' as string]: 'var(--mint)' }}>
-          <span className="tile-k">API credits today</span>
-          <span>
-            <span className="tile-v">{used}<span style={{ fontSize: 15, fontWeight: 500 }}>/{settings?.daily_credit_cap ?? 90}</span></span>
-            <span className="meter" style={{ background: 'rgba(255,255,255,.6)', marginTop: 6 }}><i style={{ width: `${Math.min(100, (used / (settings?.daily_credit_cap ?? 90)) * 100)}%` }} /></span>
-          </span>
+          <span className="tile-k">Cricket data</span>
+          <span className="tile-v" style={{ fontSize: 22 }}>{(settings as unknown as { last_cb_list_at?: string })?.last_cb_list_at ? `Updated ${istTime((settings as unknown as { last_cb_list_at: string }).last_cb_list_at)}` : 'Waiting'}</span>
         </Link>
       </div>
 
@@ -63,7 +65,8 @@ export function AdminHome() {
         </>
       )}
 
-      {needs.length > 0 && (
+      {needs === null && <div style={{ marginTop: 16 }}><SkRows n={2} avatar={false} /></div>}
+      {needs && needs.length > 0 && (
         <>
           <div className="sec"><h2>Games in progress</h2><span className="aside">all automatic</span></div>
           <div className="list" style={{ maxWidth: 560 }}>
@@ -71,7 +74,7 @@ export function AdminHome() {
               <Link key={c.id} to={`/admin/match/${c.match_id}`} className="row">
                 <span className="ic" style={{ ['--b' as string]: 'var(--warn-bg)' }}><Icon name={c.status === 'scored' ? 'trophy' : 'user'} /></span>
                 <span><span className="rt">{shortTeam(c.matches.team_a)} vs {shortTeam(c.matches.team_b)}</span>
-                  <span className="rs">{c.status === 'scored' ? 'Scored. Pays out automatically.' : `Locked ${istDayName(c.lock_at).toLowerCase()} ${istTime(c.lock_at)}. Waiting for the Playing XI from CricketData.`}</span></span>
+                  <span className="rs">{c.status === 'scored' ? 'Scored. Final results come automatically.' : `Locked ${istDayName(c.lock_at).toLowerCase()} ${istTime(c.lock_at)}. Waiting for the Playing XI from Cricbuzz.`}</span></span>
                 <Icon name="chev" />
               </Link>
             ))}
@@ -98,12 +101,11 @@ export function AdminHome() {
 }
 
 const MANAGE: { to: string; icon: IconName; label: string; sub: string }[] = [
-  { to: '/admin/members', icon: 'user', label: 'Members', sub: 'Roles, blocking, adjust a wallet' },
-  { to: '/admin/balances', icon: 'wallet', label: 'Balances', sub: 'Money you’re holding, export the ledger' },
-  { to: '/admin/money', icon: 'sliders', label: 'Money settings', sub: 'UPI ID, limits, accepted apps' },
+  { to: '/admin/members', icon: 'user', label: 'Members', sub: 'Roles, blocking, phone numbers' },
+  { to: '/admin/ledger', icon: 'wallet', label: 'Ledger', sub: 'Who owes whom across everyone' },
   { to: '/admin/rules', icon: 'trophy', label: 'Game rules', sub: 'Points, lock time, fees, ties' },
   { to: '/admin/matches', icon: 'stumps', label: 'Matches', sub: 'Show or hide matches' },
-  { to: '/admin/data', icon: 'gauge', label: 'Cricket data', sub: 'API credits, syncing, removed leagues' },
+  { to: '/admin/data', icon: 'gauge', label: 'Cricket data', sub: 'Cricbuzz sync, which matches to show' },
   { to: '/admin/notifications', icon: 'bell', label: 'Notifications', sub: 'What members are told, message everyone' },
   { to: '/admin/general', icon: 'sliders', label: 'General', sub: 'App name, admin name, home tab' },
   { to: '/admin/badges', icon: 'image', label: 'Team badges', sub: 'Upload logos for clubs and leagues' },

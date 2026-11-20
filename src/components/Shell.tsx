@@ -2,16 +2,16 @@ import type { ReactNode } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { usePendingCodeCount } from '../lib/usePendingCodes'
-import { useMoneyQueue } from '../lib/useWallet'
+import { usePendingClaims } from '../lib/usePendingClaims'
 import { Avatar } from './Avatar'
 import { OfflineBanner } from './OfflineBanner'
 import { Icon, type IconName } from './Icon'
 
 type NavItem = { to: string; icon: IconName; label: string; end?: boolean; count?: number }
 
-const USER_NAV: NavItem[] = [
+const USER_NAV_BASE: NavItem[] = [
   { to: '/', icon: 'stumps', label: 'Matches', end: true },
-  { to: '/wallet', icon: 'wallet', label: 'Wallet' },
+  { to: '/ledger', icon: 'wallet', label: 'Ledger' },
   { to: '/ranks', icon: 'trophy', label: 'Ranks' },
   { to: '/me', icon: 'user', label: 'Me' },
 ]
@@ -22,18 +22,17 @@ export function Shell({ title, kicker, actions, back, children }: {
   const { profile, isAdmin } = useAuth()
   const pending = usePendingCodeCount(isAdmin)
   const navigate = useNavigate()
-  const money = useMoneyQueue(isAdmin)
+  const claims = usePendingClaims()
+  const USER_NAV = USER_NAV_BASE.map((n) => (n.to === '/ledger' ? { ...n, count: claims } : n))
   const adminNav: NavItem[] = [
     { to: '/admin', icon: 'shield', label: 'Dashboard', end: true },
     { to: '/admin/codes', icon: 'key', label: 'Sign-in codes', count: pending },
-    { to: '/admin/payments', icon: 'receipt', label: 'Payments', count: money.payments },
-    { to: '/admin/withdrawals', icon: 'up', label: 'Withdrawals', count: money.withdrawals },
     { to: '/admin/members', icon: 'user', label: 'Members' },
-    { to: '/admin/balances', icon: 'wallet', label: 'Balances' },
+    { to: '/admin/ledger', icon: 'wallet', label: 'Ledger' },
     { to: '/admin/matches', icon: 'stumps', label: 'Matches' },
     { to: '/admin/data', icon: 'gauge', label: 'Cricket data' },
   ]
-  const mobileNav: NavItem[] = isAdmin ? [...USER_NAV, { to: '/admin', icon: 'shield', label: 'Admin', count: pending + money.payments + money.withdrawals }] : USER_NAV
+  const mobileNav: NavItem[] = isAdmin ? [...USER_NAV, { to: '/admin', icon: 'shield', label: 'Admin', count: pending }] : USER_NAV
 
   return (
     <div className="shell">

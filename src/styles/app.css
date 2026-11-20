@@ -557,3 +557,42 @@ body.plain-cards .stack.grid { padding-top: 0; }
 .split { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .split-i { display: inline-flex; gap: 4px; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; background: var(--paper); font-size: 11.5px; font-family: var(--num); }
 .split-i b { font-family: var(--text); font-weight: 700; }
+
+/* skeletons with shimmer */
+.sk { display: inline-block; background: linear-gradient(90deg, rgba(26,23,20,.07) 0%, rgba(26,23,20,.14) 40%, rgba(26,23,20,.07) 80%); background-size: 300% 100%; animation: sk-shimmer 1.3s ease-in-out infinite; vertical-align: middle; }
+.sk-card { background: var(--paper); border-radius: var(--r-lg); padding: 18px; }
+.sk-row { background: var(--paper) !important; }
+@keyframes sk-shimmer { 0% { background-position: 100% 0 } 100% { background-position: -100% 0 } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+/* ledger */
+.bal-hero { border-radius: var(--r-lg); padding: 22px; border: 1.5px solid var(--ink); }
+.bal-hero.pos { background: var(--mint); } .bal-hero.neg { background: #FFD9CC; } .bal-hero.zero { background: var(--lemon); }
+.bal-hero .big { font-family: var(--num); font-size: 46px; font-weight: 600; line-height: 1.05; margin-top: 6px; }
+.bal-split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.bal-split > div { background: rgba(255,255,255,.6); border-radius: var(--r-md); padding: 10px 12px; }
+.owe-pos { color: var(--ok); font-weight: 700; } .owe-neg { color: var(--bad); font-weight: 700; }
+.sheet-back { position: fixed; inset: 0; background: rgba(26,23,20,.45); z-index: 60; display: grid; place-items: end center; }
+.sheet { width: min(560px, 100%); background: var(--paper); border-radius: 24px 24px 0 0; padding: 22px 20px calc(22px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 30px rgba(0,0,0,.15); }
+@media (min-width: 900px) { .sheet-back { place-items: center; } .sheet { border-radius: 24px; } }
+.done-card { text-align: center; padding: 28px 20px; border-radius: var(--r-lg); background: var(--mint); border: 1.5px solid var(--ink); }
+.done-card .tick { width: 64px; height: 64px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; margin: 0 auto 12px; }
+.done-card .tick svg { width: 30px; height: 30px; }
+
+.route-loading { padding: 24px var(--g); max-width: 1180px; margin: 0 auto; }
+@media (min-width: 900px) { .route-loading { padding-left: 300px; } }
+
+/* your entry in a game */
+.entry { margin-top: 14px; background: var(--paper); border-radius: var(--r-md); padding: 14px; border: 1.5px solid var(--ink); }
+.entry-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.entry-rank { font-size: 14px; }
+.entry-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.entry-chips .chip { display: inline-flex; gap: 6px; align-items: center; padding: 5px 10px; border-radius: 999px; background: var(--soft); font-size: 13px; }
+.entry-chips .chip.ok { background: var(--mint); }
+.journey { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 0; }
+.journey li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; position: relative; padding-bottom: 10px; font-size: 14px; color: var(--muted); }
+.journey li:not(:last-child)::before { content: ''; position: absolute; left: 10px; top: 20px; bottom: 0; width: 2px; background: rgba(26,23,20,.12); }
+.journey li.done::before { background: var(--ink); }
+.journey .dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(26,23,20,.25); background: var(--paper); display: grid; place-items: center; }
+.journey li.done { color: var(--ink); } .journey li.done .dot { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.journey li.now { color: var(--ink); font-weight: 600; } .journey li.now .dot { border-color: var(--ink); box-shadow: 0 0 0 4px var(--lemon); }
+.journey .jt { line-height: 22px; } .journey .js { color: var(--muted); font-weight: 400; }

@@ -5,6 +5,7 @@ import { Shell } from '../components/Shell'
 import { useAuth } from '../lib/auth'
 import { rupees } from '../lib/money'
 import { supabase } from '../lib/supabase'
+import { SkScreen } from '../components/Skeleton'
 
 interface Row { user_id: string; name: string; color: string; played: number; won: number; winnings: number; spent: number; net: number; bonus: number }
 type Period = 'month' | 'year' | 'all'
@@ -52,6 +53,7 @@ export function Ranks() {
           <button aria-pressed={sortBy === 'bonus'} onClick={() => setSortBy('bonus')}>By bonus points</button>
         </div>
       )}
+      {!rows && <div style={{ marginTop: 16, maxWidth: 720 }}><SkScreen rows={4} /></div>}
       {rows && active.length === 0 && <Empty icon="trophy" title="No finished games yet">Ranks fill in as games finish and pay out.</Empty>}
       {leader && (
         <section className="chead" style={{ ['--c' as string]: 'var(--lemon)', marginTop: 16, maxWidth: 720, paddingBottom: 20 }}>
@@ -71,7 +73,7 @@ export function Ranks() {
               <Avatar name={r.name} color={r.color} />
               <span style={{ minWidth: 0 }}>
                 <span className="rt">{r.user_id === profile?.id ? 'You' : r.name}</span>
-                <span className="rs"><span className="num">{r.won}</span>/<span className="num">{r.played}</span> won, <span className="num">{rupees(r.winnings)}</span> won, <span className="num">{rupees(r.spent)}</span> in entries{showBonus ? <>, <span className="num">{r.bonus}</span> bonus pts</> : null}</span>
+                <span className="rs"><span className="num">{r.won}</span>/<span className="num">{r.played}</span> won · won <span className="num">{rupees(r.winnings)}</span>, lost <span className="num">{rupees(r.spent)}</span>{showBonus ? <>, <span className="num">{r.bonus}</span> bonus pts</> : null}</span>
               </span>
               <span className="pts" style={{ color: sortBy === 'bonus' ? undefined : r.net > 0 ? 'var(--ok)' : r.net < 0 ? 'var(--bad)' : undefined }}>{sortBy === 'bonus' ? r.bonus : rupees(r.net, { sign: true })}</span>
             </div>

@@ -4,6 +4,7 @@ import { istDayName, istTime } from '../lib/ist'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { Icon } from './Icon'
+import { SkRows } from './Skeleton'
 
 export interface ReportRow {
   id: string; name: string; series: string | null; category: string; format: string; starts_at: string; status_text: string | null
@@ -27,7 +28,7 @@ export function reportSummary(rows: ReportRow[]): { reason: string; n: number }[
   return [...m.entries()].map(([reason, n]) => ({ reason, n })).sort((a, b) => (a.reason === 'Shown' ? -1 : b.reason === 'Shown' ? 1 : b.n - a.n))
 }
 
-const CAN_SHOW = new Set(['Domestic matches are switched off', 'League matches are switched off', 'Women’s internationals are switched off', 'Men’s internationals are switched off', 'No fantasy data from CricketData', 'You hid it'])
+const CAN_SHOW = new Set(['Domestic matches are switched off', 'League matches are switched off', 'Women’s internationals are switched off', 'Men’s internationals are switched off', 'You hid it'])
 
 /** Admin: every match Pro11 has from the last 3 days onwards, whether members see it, and exactly why not. */
 export function MatchReport() {
@@ -35,7 +36,7 @@ export function MatchReport() {
   const { rows, reload } = useMatchReport()
   const [filter, setFilter] = useState<string>('All')
   const summary = useMemo(() => reportSummary((rows ?? []).filter((r) => r.reason !== 'Not from Cricbuzz')), [rows])
-  if (!rows) return <p className="help">Loading…</p>
+  if (!rows) return <SkRows n={6} avatar={false} />
   const all = rows.filter((r) => r.reason !== 'Not from Cricbuzz')
   const list = all.filter((r) => filter === 'All' || r.reason === filter)
   const show = async (r: ReportRow) => {

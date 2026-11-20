@@ -5,16 +5,17 @@ import { errorText } from '../../lib/api'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
 import { useSettingsForm } from '../../lib/useSettingsForm'
+import { SkPanel } from '../../components/Skeleton'
 
-type N = { n_squads_out: boolean; n_xi_out: boolean; n_lock_soon: boolean; n_lock_minutes: number; n_money: boolean; n_results: boolean; n_withdrawal: boolean }
+type N = { n_squads_out: boolean; n_xi_out: boolean; n_lock_soon: boolean; n_lock_minutes: number; n_money: boolean; n_results: boolean }
 
 export function NotificationSettings() {
   const toast = useToast()
-  const { f, set, save, busy } = useSettingsForm<N>(['n_squads_out', 'n_xi_out', 'n_lock_soon', 'n_lock_minutes', 'n_money', 'n_results', 'n_withdrawal'])
+  const { f, set, save, busy } = useSettingsForm<N>(['n_squads_out', 'n_xi_out', 'n_lock_soon', 'n_lock_minutes', 'n_money', 'n_results'])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
-  if (!f) return <Shell title="Notifications" back="/admin"><p className="help">Loading…</p></Shell>
+  if (!f) return <Shell title="Notifications" back="/admin"><SkPanel lines={7} /></Shell>
   const Sw = ({ k, label, sub }: { k: keyof N; label: string; sub?: string }) => (
     <label className="rule" style={{ cursor: 'pointer' }}><div><p className="k">{label}</p>{sub && <p className="s">{sub}</p>}</div>
       <input type="checkbox" role="switch" className="switch" checked={Boolean(f[k])} onChange={(e) => set(k, e.target.checked as never)} /></label>
@@ -39,10 +40,9 @@ export function NotificationSettings() {
               <input className="num-in" type="number" min={5} max={120} value={f.n_lock_minutes} aria-label="Minutes before the lock" onChange={(e) => set('n_lock_minutes', Math.max(5, Math.min(120, Math.floor(Number(e.target.value) || 15))))} />
               <span className="help">min</span></span>
           </div>
-          <Sw k="n_money" label="Payment approved or rejected" sub="Also wallet changes by the admin" />
-          <Sw k="n_results" label="Results and payouts" sub="Also cancelled games and refunds" />
-          <Sw k="n_withdrawal" label="Withdrawal paid or rejected" />
-          <p className="help" style={{ marginTop: 10 }}>Alerts appear in the app’s bell, and on phones that turned alerts on. Money waiting for you (payments, withdrawals) and problems (sync failures, credits at 80%, automatic refunds, removed leagues, payouts) always reach you.</p>
+          <Sw k="n_money" label="Settling up" sub="Someone says they paid you, or confirmed your payment" />
+          <Sw k="n_results" label="Results" sub="Final results, who owes whom, and cancelled games" />
+          <p className="help" style={{ marginTop: 10 }}>Alerts appear in the app’s bell, and on phones that turned alerts on. </p>
           <button className="btn primary" style={{ marginTop: 14 }} disabled={busy} onClick={() => save()}>{busy ? <span className="spinner" /> : <><Icon name="check" /><span>Save</span></>}</button>
         </section>
         <section className="panel">

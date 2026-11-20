@@ -4,7 +4,7 @@ import { Shell } from '../../components/Shell'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../lib/toast'
 
-const TABLES = ['profiles', 'wallet_txns', 'payment_proofs', 'withdrawals', 'contests', 'entries', 'xi_picks', 'fantasy_picks', 'matches', 'match_players', 'player_points', 'app_settings', 'audit_log'] as const
+const TABLES = ['profiles', 'ledger_lines', 'settlements', 'contests', 'entries', 'xi_picks', 'fantasy_picks', 'matches', 'match_players', 'player_points', 'app_settings', 'audit_log'] as const
 
 /** One-click backup of everything the admin can read, as a single JSON file. */
 export function Backup() {
@@ -35,7 +35,7 @@ export function Backup() {
     <Shell title="Backup" back="/admin">
       <section className="panel" style={{ maxWidth: 640 }}>
         <p className="rt">Download everything</p>
-        <p className="help" style={{ marginTop: 6 }}>Members, wallets and every ledger entry, payments, withdrawals, games, picks, matches, settings and the activity log, in one JSON file. Screenshots stay in storage. Keep the file private: it has phone numbers and money records.</p>
+        <p className="help" style={{ marginTop: 6 }}>Members, the ledger (who owes whom) and every payment recorded, games, picks, matches, settings and the activity log, in one JSON file. Screenshots stay in storage. Keep the file private: it has phone numbers and money records.</p>
         <button className="btn primary" style={{ marginTop: 16 }} disabled={busy} onClick={download}>{busy ? <span className="spinner" /> : <><Icon name="down" /><span>Download backup</span></>}</button>
         <p className="help" style={{ marginTop: 12 }}>For a spreadsheet of money only, use Balances → Export.</p>
       </section>
