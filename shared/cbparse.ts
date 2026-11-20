@@ -91,16 +91,34 @@ export function parseSlug(slug: string): Partial<CbMatch> {
 
 // ---------------- embedded JSON (Cricbuzz's current Next.js pages) ----------------
 /** All text that may hold JSON: plain HTML, Next.js flight data (self.__next_f.push) unescaped, __NEXT_DATA__. */
+/** Decodes a JavaScript string literal's contents (\\" \\n \\uXXXX \\xXX \\' …), which JSON.parse can't always do. */
+export function decodeJs(s: string): string {
+  return s.replace(/\\(u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[\s\S])/g, (_, e: string) =>
+    e[0] === 'u' || e[0] === 'x' ? String.fromCharCode(parseInt(e.slice(1), 16))
+      : ({ n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', '0': '\0' } as Record<string, string>)[e] ?? e)
+}
+
+const FLIGHT = /self\.__next_f\.push\(\[\d+,\s*"((?:[^"\\]|\\.)*)"\]\)/g
+
+/** Page data as one text: plain HTML, Next.js flight data (all pieces joined, every escape style decoded), __NEXT_DATA__. */
 export function jsonText(html: string): string {
   // Next.js streams its page data in pieces that can cut through the middle of an object: join them as they are.
   let flight = ''
-  for (const m of html.matchAll(/self\.__next_f\.push\(\[\d+,\s*"((?:[^"\\]|\\.)*)"\]\)/g)) {
-    try { flight += JSON.parse(`"${m[1]}"`) } catch { /* skip */ }
-  }
+  for (const m of html.matchAll(FLIGHT)) flight += decodeJs(m[1])
   let out = html + '\n' + flight
   const nd = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
   if (nd) out += '\n' + nd[1]
   return out
+}
+
+/** For diagnostics: how the page data decoded. */
+export function flightStats(html: string) {
+  const chunks = [...html.matchAll(FLIGHT)].map((m) => m[1])
+  let jsonFails = 0
+  for (const c of chunks) { try { JSON.parse(`"${c}"`) } catch { jsonFails++ } }
+  const flight = chunks.map(decodeJs).join('')
+  return { chunks: chunks.length, chunksJsonWouldFail: jsonFails, flightChars: flight.length,
+    inningsIds: [...new Set([...flight.matchAll(/"inningsId"\s*:\s*(\d+)/g)].map((m) => m[1]))] }
 }
 
 /** Balanced JSON objects that start at each match of `start` (a regex ending just before '{'). */
