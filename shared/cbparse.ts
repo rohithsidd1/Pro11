@@ -292,3 +292,105 @@ export function parseProfileRole(html: string): Role | undefined {
   const m = t.match(/Role\s*:?\s*(WK-Batsman|WK-Batter|Wicket[- ]?keeper(?: Batter)?|Batting Allrounder|Bowling Allrounder|All[- ]?rounder|Batsman|Batter|Bowler)/i)
   return roleCode(m?.[1])
 }
+
+// ---------------- current Cricbuzz pages (2026): read data by what it contains, not by field names ----------------
+// deno-lint-ignore no-explicit-any
+type J = any
+const pick = (o: J, keys: string[]) => { for (const k of keys) if (o?.[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]; return undefined }
+const ID = ['id', 'playerId', 'batId', 'bowlId', 'batsmanId', 'bowlerId', 'batid', 'bowlid']
+const NAME = ['name', 'fullName', 'playerName', 'batName', 'bowlName', 'batname', 'bowlname', 'nickName']
+
+/** Every object inside a JSON value (depth-first), with the chain of keys that led to it. */
+function walk(v: J, path: string[] = [], out: { o: J; path: string[] }[] = []): { o: J; path: string[] }[] {
+  if (Array.isArray(v)) v.forEach((x, i) => walk(x, [...path, String(i)], out))
+  else if (v && typeof v === 'object') { out.push({ o: v, path }); for (const [k, x] of Object.entries(v)) walk(x, [...path, k], out) }
+  return out
+}
+const isBatter = (o: J) => pick(o, ID) !== undefined && ('balls' in o || 'b' in o) && ('runs' in o || 'r' in o) && !('overs' in o)
+const isBowler = (o: J) => pick(o, ID) !== undefined && 'overs' in o && ('wickets' in o || 'w' in o)
+
+/** Innings from any JSON scorecard shape: objects holding batters and bowlers. */
+export function inningsFromJson(html: string): CbInnings[] {
+  const roots = [...objectsAt(jsonText(html), /"scoreCard"\s*:\s*\[\s*(?=\{)/, 20), ...objectsAt(jsonText(html), /"scorecard"\s*:\s*\[\s*(?=\{)/, 20),
+    ...objectsAt(jsonText(html), /(?=\{"inningsId"\s*:)|(?=\{"inningsid"\s*:)|(?=\{"matchId"\s*:\s*\d+\s*,\s*"inningsId")/, 40)]
+  const seen = new Set<string>()
+  const out: CbInnings[] = []
+  for (const r of roots) {
+    const root = r as J
+    const nodes = walk(root)
+    const bats = nodes.filter((n) => isBatter(n.o)).map((n) => n.o)
+    const bowls = nodes.filter((n) => isBowler(n.o)).map((n) => n.o)
+    if (!bats.length) continue
+    const key = bats.map((b) => pick(b, ID)).join(',')
+    if (seen.has(key)) continue
+    seen.add(key)
+    const team = String(pick(root, ['batTeamName', 'batteamname', 'teamName']) ?? pick(root.batTeamDetails, ['batTeamName']) ?? '')
+    const sd = root.scoreDetails ?? root
+    out.push({
+      team, score: '', r: num(pick(sd, ['runs', 'score'])), w: num(pick(sd, ['wickets', 'wkts'])), o: num(pick(sd, ['overs'])),
+      batting: bats.map((b) => {
+        const dis = String(pick(b, ['outDesc', 'outdec', 'outDec', 'dismissal', 'dismissalText', 'outDescription']) ?? '')
+        return { id: String(pick(b, ID)), name: String(pick(b, NAME) ?? ''), dismissal: dis, r: num(pick(b, ['runs', 'r'])), b: num(pick(b, ['balls', 'b'])),
+          fours: num(pick(b, ['fours', '4s', 'boundaries'])), sixes: num(pick(b, ['sixes', '6s'])), out: !!dis && !/not out|batting/i.test(dis) }
+      }),
+      bowling: bowls.map((b) => ({ id: String(pick(b, ID)), name: String(pick(b, NAME) ?? ''), overs: num(pick(b, ['overs', 'o'])),
+        maidens: num(pick(b, ['maidens', 'm'])), runs: num(pick(b, ['runs', 'r'])), wickets: num(pick(b, ['wickets', 'w'])) })),
+      dnb: [],
+    })
+  }
+  return out
+}
+
+/**
+ * Squads and Playing XI from a current squads page: player objects (id + name), grouped by team and by the
+ * nearest list they sit in ("playing XI", "bench", "squad"…), whatever the exact layout.
+ */
+export function squadsFromJson(html: string): CbTeam[] {
+  const jt = jsonText(html)
+  const teams = new Map<string, CbTeam>()
+  const groupOf = (p: string[]) => {
+    const s = p.join('/').toLowerCase()
+    return /playing ?xi|playingxi|playing11/.test(s) ? 'playing' as const : /bench|substitute|sub\b/.test(s) ? 'bench' as const : 'squad' as const
+  }
+  for (const root of objectsAt(jt, /(?=\{"(?:team1|teamDetails|team|squads?|players?|player)"\s*:)/, 60) as J[]) {
+    for (const n of walk(root)) {
+      const o = n.o
+      if (pick(o, ['id', 'playerId']) === undefined || !pick(o, ['name', 'fullName']) || !('role' in o || 'captain' in o || 'keeper' in o || 'isCaptain' in o)) continue
+      // team: a field on the player, else the nearest team object above it in the path (team1 / team2 …)
+      let team = String(pick(o, ['teamName', 'teamSName']) ?? '')
+      if (!team) { const t = n.path.find((k) => /^team[12]$|^team$/i.test(k)); team = t ?? 'team' }
+      const t = teams.get(team) ?? { name: team, players: [] }
+      const id = String(pick(o, ['id', 'playerId']))
+      if (t.players.some((p) => p.id === id)) continue
+      let group = groupOf(n.path)
+      if (group === 'squad' && o.substitute === true) group = 'bench'
+      t.players.push({ id, name: String(pick(o, ['fullName', 'name'])), captain: !!(o.captain ?? o.isCaptain), keeper: !!(o.keeper ?? o.isKeeper), group })
+      teams.set(team, t)
+    }
+    if (teams.size >= 2) break
+  }
+  // "substitute" layout: once some players are marked substitute, the other 11 are the Playing XI
+  for (const t of teams.values()) {
+    const sq = t.players.filter((p) => p.group === 'squad'), bench = t.players.filter((p) => p.group === 'bench')
+    if (!t.players.some((p) => p.group === 'playing') && sq.length === 11 && bench.length > 0) sq.forEach((p) => { p.group = 'playing' })
+  }
+  // if team names were only "team1"/"team2", take real names from team objects in the page
+  const named = objectsAt(jt, /"team[12]"\s*:\s*/, 10).map((t) => String((t as J)?.teamName ?? (t as J)?.name ?? '')).filter(Boolean)
+  const list = [...teams.values()]
+  list.forEach((t, i) => { if (/^team[12]?$/i.test(t.name) && named[i]) t.name = named[i] })
+  return list
+}
+
+/** Toss and status from any JSON on a match page. */
+export function headerFromJson(html: string): { toss?: { text: string; winner?: string; choice?: string }; status?: string; state?: State; startsAt?: string } {
+  const jt = jsonText(html)
+  const out: { toss?: { text: string; winner?: string; choice?: string }; status?: string; state?: State; startsAt?: string } = {}
+  const tr = objectsAt(jt, /"tossResults"\s*:\s*/, 3)[0] as J
+  if (tr?.tossWinnerName) {
+    const choice = /bowl|field/i.test(String(tr.decision ?? '')) ? 'bowl' : 'bat'
+    out.toss = { text: `${tr.tossWinnerName} won the toss and opt to ${choice}`, winner: tr.tossWinnerName, choice }
+  }
+  const mh = (objectsAt(jt, /"matchHeader"\s*:\s*/, 2)[0] ?? objectsAt(jt, /"matchInfo"\s*:\s*/, 2)[0]) as J
+  if (mh) { out.status = mh.status; out.state = stateFrom(mh.state) ?? stateFrom(mh.status); out.startsAt = tsIso(mh.matchStartTimestamp ?? mh.startDate) }
+  return out
+}

@@ -1,7 +1,7 @@
 // Pro11 · Cricbuzz reader (unofficial). Fetches public Cricbuzz pages and returns clean data.
 //   POST (from the sync function, header x-proxy-token): { action: 'list' | 'schedule' | 'info' | 'scorecard' | 'roles', ... }
 //   GET  /.netlify/functions/cricbuzz?debug=1[&id=123&slug=...]  → a readable health report (for the admin / Claude)
-import { parseMatchList, parseProfileRole, parseRoles, parseScorecard, text, type CbMatch, type Role } from '../../shared/cbparse.ts'
+import { headerFromJson, inningsFromJson, jsonText, parseMatchList, parseProfileRole, parseRoles, parseScorecard, squadsFromJson, text, type CbMatch, type Role } from '../../shared/cbparse.ts'
 import { computePoints, rulesFor, type Rules } from '../../shared/points.ts'
 
 // deno-lint-ignore no-explicit-any
@@ -51,16 +51,29 @@ async function schedule() {
   return { matches: mergeLists(parsed), sources: pages.map((p, i) => report(p, parsed[i].length)) }
 }
 
-/** Scorecard + match info + squads/Playing XI for one match (legacy HTML API first, then the match page). */
+/**
+ * Scorecard + match info + squads/Playing XI for one match.
+ * Cricbuzz's old HTML API first; then the current scorecard page (innings) and squads page (teams, Playing XI).
+ */
 async function scorecardFor(id: string, slug?: string) {
-  let g = await get(`${WWW()}/api/html/cricket-scorecard/${id}`, slug ? 4500 : 8000)
-  let sc = parseScorecard(g.html)
-  const tried = [report(g, sc.innings.length + sc.teams.length)]
-  if (!sc.teams.length && !sc.innings.length && slug) {
-    g = await get(`${WWW()}/live-cricket-scorecard/${id}/${slug}`, 4500)
-    const alt = parseScorecard(g.html)
-    tried.push(report(g, alt.innings.length + alt.teams.length))
-    if (alt.teams.length || alt.innings.length) sc = alt
+  const legacy = await get(`${WWW()}/api/html/cricket-scorecard/${id}`, 3000)
+  let sc = parseScorecard(legacy.html)
+  const tried = [report(legacy, sc.innings.length + sc.teams.length)]
+  if (slug && (!sc.teams.length || !sc.innings.length)) {
+    const [card, squads] = await Promise.all([
+      get(`${WWW()}/live-cricket-scorecard/${id}/${slug}`, 5000), get(`${WWW()}/cricket-match-squads/${id}/${slug}`, 5000),
+    ])
+    const fromCard = parseScorecard(card.html)
+    const inns = fromCard.innings.length && fromCard.innings.some((i) => i.bowling.length) ? fromCard.innings : inningsFromJson(card.html)
+    const teams = squadsFromJson(squads.html)
+    const head = { ...headerFromJson(squads.html), ...Object.fromEntries(Object.entries(headerFromJson(card.html)).filter(([, v]) => v)) }
+    tried.push(report(card, inns.length), report(squads, teams.reduce((n, t) => n + t.players.length, 0)))
+    if (!sc.innings.length && inns.length) sc.innings = inns
+    if (!sc.teams.length && teams.length) sc.teams = teams
+    if (!sc.status) sc.status = head.status ?? fromCard.status
+    if (!sc.toss && head.toss) sc.toss = head.toss
+    if (!sc.startsAt && head.startsAt) sc.startsAt = head.startsAt
+    sc.state = sc.state ?? head.state ?? fromCard.state
   }
   return { sc, sources: tried }
 }
@@ -84,6 +97,20 @@ export default async (req: Request) => {
 
   // ---- health report you can open in a browser ----
   if (req.method === 'GET') {
+    if (url.searchParams.has('raw')) {
+      const path = url.searchParams.get('raw') ?? ''
+      if (!/^\/(live-cricket-scorecard|cricket-match-squads|live-cricket-scores|cricket-scores|api\/html\/cricket-scorecard)\/\d+/.test(path)) return json({ error: 'Only Cricbuzz match pages.' }, 400)
+      const g = await get(`${WWW()}${path}`, 8000)
+      const jt = jsonText(g.html)
+      const keys = (url.searchParams.get('keys') ?? 'bowl,playing,bench,toss,captain').split(',').filter(Boolean).slice(0, 8)
+      const snippets: Record<string, string[]> = {}
+      for (const k of keys) {
+        const re = new RegExp(k.replace(/[^a-zA-Z0-9 ]/g, ''), 'gi'); const found: string[] = []
+        for (const m of jt.matchAll(re)) { found.push(jt.slice(Math.max(0, (m.index ?? 0) - 160), (m.index ?? 0) + 340)); if (found.length >= 3) break }
+        snippets[k] = found
+      }
+      return json({ status: g.status, bytes: g.html.length, jsonBytes: jt.length - g.html.length, snippets })
+    }
     if (!url.searchParams.has('debug')) return json({ ok: true, hint: 'Add ?debug=1 for a health report.' })
     const id = url.searchParams.get('id') ?? undefined
     const slug = url.searchParams.get('slug') ?? undefined
