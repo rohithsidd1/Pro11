@@ -130,7 +130,7 @@ export function objectsAt(src: string, start: RegExp, max = 400): unknown[] {
     while (i < src.length && src[i] !== '{') i++
     if (src[i] !== '{') continue
     let depth = 0, inStr = false, esc = false, j = i
-    for (; j < src.length && j < i + 200000; j++) {
+    for (; j < src.length && j < i + 3000000; j++) {
       const c = src[j]
       if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue }
       if (c === '"') inStr = true
@@ -357,6 +357,50 @@ export function inningsFromJson(html: string): CbInnings[] {
         maidens: num(pick(b, ['maidens', 'm'])), runs: num(pick(b, ['runs', 'r'])), wickets: num(pick(b, ['wickets', 'w'])) })),
       dnb: [],
     })
+  }
+  if (out.length < 2) {
+    const jt = jsonText(html)
+    const batT = objectsAt(jt, /"batTeamDetails"\s*:\s*/, 40) as J[]
+    const bowlT = objectsAt(jt, /"bowlTeamDetails"\s*:\s*/, 40) as J[]
+    const scores = objectsAt(jt, /"scoreDetails"\s*:\s*/, 40) as J[]
+    batT.forEach((bt, k) => {
+      const bats = walk(bt).filter((n) => isBatter(n.o)).map((n) => n.o)
+      if (!bats.length) return
+      const key = bats.map((b) => pick(b, ID)).join(',')
+      if (seen.has(key)) return
+      seen.add(key)
+      const bowls = walk(bowlT[k] ?? {}).filter((n) => isBowler(n.o)).map((n) => n.o)
+      const sd = scores[k] ?? {}
+      out.push({
+        team: String(pick(bt, ['batTeamName', 'teamName']) ?? ''), score: '', r: num(pick(sd, ['runs'])), w: num(pick(sd, ['wickets'])), o: num(pick(sd, ['overs'])),
+        batting: bats.map((b) => {
+          const dis = String(pick(b, ['outDesc', 'outdec', 'outDec', 'dismissal']) ?? '')
+          return { id: String(pick(b, ID)), name: String(pick(b, NAME) ?? ''), dismissal: dis, r: num(pick(b, ['runs'])), b: num(pick(b, ['balls'])),
+            fours: num(pick(b, ['fours'])), sixes: num(pick(b, ['sixes'])), out: !!dis && !/not out|batting/i.test(dis) }
+        }),
+        bowling: bowls.map((b) => ({ id: String(pick(b, ID)), name: String(pick(b, NAME) ?? ''), overs: num(pick(b, ['overs'])), maidens: num(pick(b, ['maidens'])), runs: num(pick(b, ['runs'])), wickets: num(pick(b, ['wickets'])) })),
+        dnb: [],
+      })
+    })
+  }
+  return out
+}
+
+/** For diagnostics: does each innings object on the page read, and if not, why. */
+export function inningsDiag(html: string) {
+  const jt = jsonText(html)
+  const out: { at: number; ok: boolean; chars: number; error?: string }[] = []
+  for (const m of jt.matchAll(/(?=\{"matchId"\s*:\s*\d+\s*,\s*"inningsId")/g)) {
+    const i = m.index ?? 0
+    let depth = 0, inStr = false, esc = false, j = i
+    for (; j < jt.length; j++) {
+      const c = jt[j]
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue }
+      if (c === '"') inStr = true; else if (c === '{') depth++; else if (c === '}') { depth--; if (depth === 0) break }
+    }
+    try { JSON.parse(jt.slice(i, j + 1)); out.push({ at: i, ok: true, chars: j + 1 - i }) }
+    catch (e) { out.push({ at: i, ok: false, chars: j + 1 - i, error: String(e).slice(0, 160) + ' … ' + jt.slice(Math.max(i, j - 60), j + 1).slice(0, 80) }) }
+    if (out.length >= 8) break
   }
   return out
 }

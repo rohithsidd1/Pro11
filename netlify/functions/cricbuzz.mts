@@ -1,7 +1,7 @@
 // Pro11 · Cricbuzz reader (unofficial). Fetches public Cricbuzz pages and returns clean data.
 //   POST (from the sync function, header x-proxy-token): { action: 'list' | 'schedule' | 'info' | 'scorecard' | 'roles', ... }
 //   GET  /.netlify/functions/cricbuzz?debug=1[&id=123&slug=...]  → a readable health report (for the admin / Claude)
-import { flightStats, headerFromJson, inningsFromJson, jsonText, parseMatchList, parseProfileRole, parseRoles, parseScorecard, squadsFromJson, text, type CbMatch, type Role } from '../../shared/cbparse.ts'
+import { flightStats, headerFromJson, inningsDiag, inningsFromJson, jsonText, parseMatchList, parseProfileRole, parseRoles, parseScorecard, squadsFromJson, text, type CbMatch, type Role } from '../../shared/cbparse.ts'
 import { computePoints, rulesFor, type Rules } from '../../shared/points.ts'
 
 // deno-lint-ignore no-explicit-any
@@ -109,7 +109,7 @@ export default async (req: Request) => {
         for (const m of jt.matchAll(re)) { found.push(jt.slice(Math.max(0, (m.index ?? 0) - 160), (m.index ?? 0) + 340)); if (found.length >= 3) break }
         snippets[k] = found
       }
-      return json({ status: g.status, bytes: g.html.length, jsonBytes: jt.length - g.html.length, flight: flightStats(g.html), innings: inningsFromJson(g.html).map((i) => `${i.team}: ${i.batting.length} bat, ${i.bowling.length} bowl`), snippets })
+      return json({ status: g.status, bytes: g.html.length, jsonBytes: jt.length - g.html.length, flight: flightStats(g.html), inningsObjects: inningsDiag(g.html), innings: inningsFromJson(g.html).map((i) => `${i.team}: ${i.batting.length} bat, ${i.bowling.length} bowl`), snippets })
     }
     if (!url.searchParams.has('debug')) return json({ ok: true, hint: 'Add ?debug=1 for a health report.' })
     const id = url.searchParams.get('id') ?? undefined
