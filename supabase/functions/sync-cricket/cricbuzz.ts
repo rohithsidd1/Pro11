@@ -154,7 +154,7 @@ async function applyInfo(ctx: CbCtx, matchId: string, sc: Any): Promise<{ player
   const prev = new Map((had ?? []).map((h: Any) => [h.player_id, h]))
   const rows = all.map((p) => {
     const before: Any = prev.get(p.id)
-    const known = roles.get(p.id)
+    const known = p.role ?? roles.get(p.id)
     return {
       match_id: matchId, player_id: p.id, name: p.name, team: p.team,
       role: known ?? before?.role ?? (p.keeper ? 'WK' : 'BAT'),
@@ -163,14 +163,12 @@ async function applyInfo(ctx: CbCtx, matchId: string, sc: Any): Promise<{ player
   })
   const { error: upErr } = await ctx.db.from('match_players').upsert(rows, { onConflict: 'match_id,player_id' })
   if (upErr) throw upErr
-  await ctx.db.from('cb_players').upsert(all.filter((p) => !roles.has(p.id)).map((p) => ({ profile_id: p.id, name: p.name, slug: p.slug ?? null })), { onConflict: 'profile_id', ignoreDuplicates: true })
+  await ctx.db.from('cb_players').upsert(all.map((p) => ({ profile_id: p.id, name: p.name, slug: p.slug ?? null, role: p.role ?? roles.get(p.id) ?? null, checked_at: isoNow() })), { onConflict: 'profile_id' })
 
   const perTeam = new Map<string, number>()
   for (const p of all) perTeam.set(p.team, (perTeam.get(p.team) ?? 0) + 1)
-  const unknown = rows.filter((r) => r.api_role === 'unknown').length
-  const squadsReady = perTeam.size === 2 && [...perTeam.values()].every((n) => n >= 11) && unknown === 0
+  const squadsReady = perTeam.size === 2 && [...perTeam.values()].every((n) => n >= 11)
   if (squadsReady && !m.has_squad) await ctx.db.from('matches').update({ has_squad: true, squad_fetched_at: m.squad_fetched_at ?? isoNow() }).eq('id', matchId)
-  else if (perTeam.size === 2 && !m.squad_fetched_at && unknown === 0) await ctx.db.from('matches').update({ squad_fetched_at: isoNow() }).eq('id', matchId)
 
   // Playing XI: exactly 11 "Playing" a side
   const xi = new Map<string, string[]>()
@@ -187,34 +185,41 @@ async function applyInfo(ctx: CbCtx, matchId: string, sc: Any): Promise<{ player
   return { players: all.length, xi: xiOk }
 }
 
-/** Upcoming matches that members can see (or that have games): confirm time and load squads. */
-async function cbInfoPass(ctx: CbCtx, budget: number) {
+/**
+ * Upcoming matches members can see (or that have games): squads with roles, toss, Playing XI.
+ * Within 2 hours of the start: every 5 minutes (to catch the toss and Playing XI). Squads not out yet:
+ * every 15 minutes (48 h ahead) or 2 hours (later). Squads already loaded and more than 2 hours away: every 6 hours.
+ */
+async function cbInfoPass(ctx: CbCtx, budget: number, force = false) {
   const now = Date.now()
   const { data: rows } = await ctx.db.from('matches')
     .select('id, cb_slug, starts_at, cb_info_at, has_squad, category, is_women, visibility, series_id, xi_source')
     .like('id', 'cb-%').eq('ended', false)
-    .gte('starts_at', new Date(now - 6 * 36e5).toISOString()).lte('starts_at', new Date(now + 72 * 36e5).toISOString())
-    .order('starts_at').limit(200)
+    .gte('starts_at', new Date(now - 6 * 36e5).toISOString()).lte('starts_at', new Date(now + 10 * 864e5).toISOString())
+    .order('starts_at').limit(300)
   const { data: blocked } = await ctx.db.from('blocked_series').select('series_id')
   const bl = new Set((blocked ?? []).map((b: Any) => b.series_id))
   const { data: games } = await ctx.db.from('contests').select('match_id').in('status', ['open', 'locked', 'scored'])
   const withGames = new Set((games ?? []).map((g: Any) => g.match_id))
   const s = ctx.s
-  const visible = (m: Any) => withGames.has(m.id) || (m.visibility !== 'hidden' && !bl.has(m.series_id) && (m.visibility === 'shown'
-    || (m.category === 'international' && !m.is_women && s.show_men_intl) || (m.category === 'international' && m.is_women && s.show_women_intl)
-    || (m.category === 'league' && s.show_leagues) || (m.category !== 'international' && m.category !== 'league' && s.show_domestic)))
+  const visible = (m: Any) => withGames.has(m.id) || (m.visibility !== 'hidden' && !bl.has(m.series_id) && (!m.is_women || s.show_women_intl) && (m.visibility === 'shown'
+    || (m.category === 'international' && s.show_men_intl) || (m.category === 'league' && s.show_leagues)
+    || (m.category !== 'international' && m.category !== 'league' && s.show_domestic)))
   const due = (rows ?? []).filter((m: Any) => {
     if (!visible(m)) return false
+    if (force) return true
     const hoursAway = (new Date(m.starts_at).getTime() - now) / 36e5
-    const every = withGames.has(m.id) && !m.xi_source && hoursAway < 1 ? 10 : hoursAway < 24 ? (m.has_squad ? 120 : 45) : 360
-    return minutesSince(m.cb_info_at) >= every
+    const every = hoursAway < 2 && !m.xi_source ? 5 : !m.has_squad ? (hoursAway < 48 ? 15 : 120) : 360
+    return minutesSince(m.cb_info_at) >= every - 0.5
   }).slice(0, budget)
   const out: Record<string, unknown> = {}
-  for (const m of due) {
-    const body = await cb(ctx, 'info', { id: m.id.slice(3), slug: m.cb_slug ?? undefined })
-    if (!body) { await ctx.db.from('matches').update({ cb_info_at: isoNow() }).eq('id', m.id); continue }
-    out[m.id] = await applyInfo(ctx, m.id, body.scorecard)
-    if (ENDED_BAD.test(body.scorecard?.status ?? '')) await ctx.db.rpc('refund_match', { p_match: m.id, p_reason: 'Match abandoned or no result' })
+  for (let i = 0; i < due.length; i += 4) {
+    await Promise.all(due.slice(i, i + 4).map(async (m: Any) => {
+      const body = await cb(ctx, 'info', { id: m.id.slice(3) })
+      if (!body) { await ctx.db.from('matches').update({ cb_info_at: isoNow() }).eq('id', m.id); return }
+      out[m.id] = await applyInfo(ctx, m.id, body.scorecard)
+      if (ENDED_BAD.test(body.scorecard?.status ?? '') && body.scorecard?.state === 'ended') await ctx.db.rpc('refund_match', { p_match: m.id, p_reason: 'Match abandoned or no result' })
+    }))
   }
   return out
 }
@@ -264,12 +269,12 @@ async function cbLivePass(ctx: CbCtx, budget: number) {
   const now = Date.now()
   const out: Record<string, unknown> = {}
   const due = [...byMatch.values()].filter(({ m }) => !m.ended && now >= new Date(m.starts_at).getTime() - 45 * 60e3
-    && minutesSince(m.cb_live_at) >= Math.max(3, ctx.s.cb_live_minutes ?? 5)).slice(0, budget)
+    && minutesSince(m.cb_live_at) >= Math.max(1, ctx.s.cb_live_minutes ?? 1) - 0.25).slice(0, budget)
   for (const { m, games: gs } of due) {
     await ctx.db.from('matches').update({ cb_live_at: isoNow() }).eq('id', m.id)
     const { data: known } = await ctx.db.from('match_players').select('player_id, role').eq('match_id', m.id)
     const roles = Object.fromEntries((known ?? []).map((p: Any) => [p.player_id, p.role]))
-    const body = await cb(ctx, 'scorecard', { id: m.id.slice(3), slug: m.cb_slug ?? undefined, format: m.format, rules: ctx.s.fx_rules ?? {}, roles })
+    const body = await cb(ctx, 'scorecard', { id: m.id.slice(3), format: m.format, rules: ctx.s.fx_rules ?? {}, roles })
     if (!body) continue
     const sc = body.scorecard
     const info = await applyInfo(ctx, m.id, sc)
@@ -296,13 +301,13 @@ async function cbLivePass(ctx: CbCtx, budget: number) {
 export async function tickCricbuzz(ctx: CbCtx) {
   if (ctx.s.sync_paused) return { skipped: 'Syncing is paused' }
   const out: Record<string, unknown> = {}
-  if (minutesSince(ctx.s.last_cb_list_at) >= (ctx.s.cb_list_minutes ?? 30) - 1) out.list = await cbList(ctx)
+  if (minutesSince(ctx.s.last_cb_list_at) >= (ctx.s.cb_list_minutes ?? 5) - 0.5) out.list = await cbList(ctx)
   if (minutesSince(ctx.s.last_cb_schedule_at) >= (ctx.s.cb_schedule_hours ?? 12) * 60 - 1) out.schedule = await cbSchedule(ctx)
   const live = await cbLivePass(ctx, 4)
   if (Object.keys(live).length) out.live = live
-  const info = await cbInfoPass(ctx, 6)
+  const info = await cbInfoPass(ctx, 8)
   if (Object.keys(info).length) out.info = info
-  const roles = await cbRoles(ctx, 2)
+  const roles = await cbRoles(ctx, 1)
   if (roles.learned) out.roles = roles
   const { data: opened } = await ctx.db.rpc('notify_squads_out')   // games that just opened, from any step above
   if (opened) out.squadsOut = opened
@@ -310,12 +315,22 @@ export async function tickCricbuzz(ctx: CbCtx) {
 }
 
 export async function cbManual(ctx: CbCtx, mode: string, matchId: string | null) {
+  if (mode === 'sync-now') {
+    const list = await cbList(ctx)
+    const schedule = await cbSchedule(ctx)
+    const live = await cbLivePass(ctx, 6)
+    const info = await cbInfoPass(ctx, 24, true)
+    await ctx.db.rpc('notify_squads_out')
+    return { list, schedule, live: Object.keys(live).length, squadsChecked: Object.keys(info).length,
+      message: `${list.found ?? 0} matches, ${Object.keys(info).length} squads checked, ${Object.keys(live).length} live updated` }
+  }
   if (mode === 'list') return await cbList(ctx)
   if (mode === 'fixtures') return await cbSchedule(ctx)
   if ((mode === 'info' || mode === 'squad' || mode === 'squad-for-entry') && matchId?.startsWith('cb-')) {
     const { data: m } = await ctx.db.from('matches').select('cb_slug').eq('id', matchId).maybeSingle()
-    const body = await cb(ctx, 'info', { id: matchId.slice(3), slug: m?.cb_slug ?? undefined })
+    const body = await cb(ctx, 'info', { id: matchId.slice(3) })
     if (!body) return { message: 'Cricbuzz didn’t answer. Try again in a minute.' }
+    void m
     const r = await applyInfo(ctx, matchId, body.scorecard)
     await cbRoles(ctx, 1)
     return { ...r, message: r.players ? `${r.players} players loaded${r.xi ? ', Playing XI set' : ''}.` : 'Squads aren’t on Cricbuzz yet. Pro11 checks again automatically.' }

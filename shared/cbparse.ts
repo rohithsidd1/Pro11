@@ -11,7 +11,7 @@ export interface CbMatch {
   desc?: string; series?: string; seriesId?: string; format?: Fmt; state?: State; statusText?: string
   startsAt?: string; venue?: string
 }
-export interface CbPlayer { id: string; name: string; slug?: string; captain?: boolean; keeper?: boolean; group: 'playing' | 'bench' | 'squad' }
+export interface CbPlayer { id: string; name: string; slug?: string; captain?: boolean; keeper?: boolean; role?: Role; group: 'playing' | 'bench' | 'squad' }
 export interface CbTeam { name: string; players: CbPlayer[] }
 export interface CbBat { id: string; name: string; dismissal: string; r: number; b: number; fours: number; sixes: number; out: boolean }
 export interface CbBowl { id: string; name: string; overs: number; maidens: number; runs: number; wickets: number }
@@ -416,19 +416,26 @@ export function squadsFromJson(html: string): CbTeam[] {
     const s = p.join('/').toLowerCase()
     return /playing ?xi|playingxi|playing11/.test(s) ? 'playing' as const : /bench|substitute|sub\b/.test(s) ? 'bench' as const : 'squad' as const
   }
-  for (const root of objectsAt(jt, /(?=\{"(?:team1|teamDetails|team|squads?|players?|player)"\s*:)/, 60) as J[]) {
+  // team names by team id, from any team-details object on the page
+  const teamNames = new Map<string, string>()
+  for (const t of objectsAt(jt, /(?=\{"teamId"\s*:\s*\d+\s*,\s*"teamName")/, 40) as J[]) if (t?.teamId && t.teamName) teamNames.set(String(t.teamId), String(t.teamName))
+  for (const root of objectsAt(jt, /(?=\{"(?:team1|teamDetails|team|squads?|players?|player|matchSquads)"\s*:)/, 60) as J[]) {
+    for (const n of walk(root)) if (n.o?.teamId && n.o?.teamName && !('role' in n.o)) teamNames.set(String(n.o.teamId), String(n.o.teamName))
+  }
+  for (const root of objectsAt(jt, /(?=\{"(?:team1|teamDetails|team|squads?|players?|player|matchSquads)"\s*:)/, 60) as J[]) {
     for (const n of walk(root)) {
       const o = n.o
       if (pick(o, ['id', 'playerId']) === undefined || !pick(o, ['name', 'fullName']) || !('role' in o || 'captain' in o || 'keeper' in o || 'isCaptain' in o)) continue
       // team: a field on the player, else the nearest team object above it in the path (team1 / team2 …)
-      let team = String(pick(o, ['teamName', 'teamSName']) ?? '')
+      let team = String(pick(o, ['teamName']) ?? (o.teamId !== undefined ? teamNames.get(String(o.teamId)) ?? '' : ''))
       if (!team) { const t = n.path.find((k) => /^team[12]$|^team$/i.test(k)); team = t ?? 'team' }
       const t = teams.get(team) ?? { name: team, players: [] }
       const id = String(pick(o, ['id', 'playerId']))
       if (t.players.some((p) => p.id === id)) continue
       let group = groupOf(n.path)
       if (group === 'squad' && o.substitute === true) group = 'bench'
-      t.players.push({ id, name: String(pick(o, ['fullName', 'name'])), captain: !!(o.captain ?? o.isCaptain), keeper: !!(o.keeper ?? o.isKeeper), group })
+      const keeper = !!(o.keeper ?? o.isKeeper)
+      t.players.push({ id, name: String(pick(o, ['fullName', 'name'])), captain: !!(o.captain ?? o.isCaptain), keeper, role: keeper ? 'WK' : roleCode(o.role), group })
       teams.set(team, t)
     }
     if (teams.size >= 2) break

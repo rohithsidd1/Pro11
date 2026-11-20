@@ -34,9 +34,10 @@ export function MatchReport() {
   const toast = useToast()
   const { rows, reload } = useMatchReport()
   const [filter, setFilter] = useState<string>('All')
-  const summary = useMemo(() => reportSummary(rows ?? []), [rows])
+  const summary = useMemo(() => reportSummary((rows ?? []).filter((r) => r.reason !== 'Not from Cricbuzz')), [rows])
   if (!rows) return <p className="help">Loading…</p>
-  const list = rows.filter((r) => filter === 'All' || r.reason === filter)
+  const all = rows.filter((r) => r.reason !== 'Not from Cricbuzz')
+  const list = all.filter((r) => filter === 'All' || r.reason === filter)
   const show = async (r: ReportRow) => {
     const { error } = await supabase.rpc('admin_set_match_visibility', { p_id: r.id, p_visibility: r.reason === 'You hid it' ? 'auto' : 'shown' })
     if (error) return toast(errorText(error))
@@ -44,10 +45,10 @@ export function MatchReport() {
   }
   return (
     <section className="panel" style={{ marginBottom: 16 }}>
-      <div className="ch"><h3>What members see, and why</h3><span className="help num">{rows.length} matches</span></div>
+      <div className="ch"><h3>What members see, and why</h3><span className="help num">{all.length} matches</span></div>
       <p className="help" style={{ marginBottom: 10 }}>Every match Pro11 has from the last 3 days onwards. Uses exactly the same rules as the members’ list.</p>
       <div className="chips" role="group" aria-label="Filter by reason" style={{ flexWrap: 'wrap', width: 'auto' }}>
-        <button className="chip" aria-pressed={filter === 'All'} onClick={() => setFilter('All')}>All <span className="num">{rows.length}</span></button>
+        <button className="chip" aria-pressed={filter === 'All'} onClick={() => setFilter('All')}>All <span className="num">{all.length}</span></button>
         {summary.map((s) => (
           <button key={s.reason} className="chip" aria-pressed={filter === s.reason} onClick={() => setFilter(s.reason)}>{s.reason} <span className="num">{s.n}</span></button>
         ))}

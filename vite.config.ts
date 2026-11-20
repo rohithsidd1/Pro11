@@ -2,9 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const BUILD_TIME = new Date().toISOString()
+const versionFile = { name: 'pro11-version', generateBundle(this: { emitFile: (f: { type: 'asset'; fileName: string; source: string }) => void }) {
+  this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ build: BUILD_TIME }) })
+} }
+
 export default defineConfig({
-  define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
+  define: { __BUILD_TIME__: JSON.stringify(BUILD_TIME) },
   plugins: [
+    versionFile,
     react(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -27,6 +33,7 @@ export default defineConfig({
       workbox: {
         navigateFallback: '/index.html',
         importScripts: ['push-sw.js'],
+        globIgnores: ['**/version.json'],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
       },
     }),

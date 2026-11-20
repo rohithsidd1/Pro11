@@ -30,7 +30,8 @@ export function AdminMatches() {
   const { settings, used, reload: reloadStatus } = useDataStatus()
   const [tab, setTab] = useState<'Today' | 'Tomorrow' | 'Later' | 'Live'>('Today')
   const [busy, setBusy] = useState(false)
-  const list = filterMatches(matches, tab, 'All', undefined, { liveAll: true })
+  const cbOnly = ((settings as unknown as { data_source?: string })?.data_source ?? 'cricbuzz') === 'cricbuzz'
+  const list = filterMatches(cbOnly ? matches.filter((m) => m.id.startsWith('cb-')) : matches, tab, 'All', undefined, { liveAll: true })
   const [blocked, setBlocked] = useState<Set<string>>(new Set())
   useEffect(() => { void supabase.from('blocked_series').select('series_id').then(({ data }) => setBlocked(new Set((data ?? []).map((r: { series_id: string }) => r.series_id)))) }, [])
 
@@ -54,10 +55,10 @@ export function AdminMatches() {
     <Shell title="Matches" kicker="What members see, and why"
       actions={<button className="btn sm primary" onClick={refresh} disabled={busy}>{busy ? <span className="spinner" /> : <Icon name="refresh" small />}<span>Refresh now</span></button>}>
       <MatchReport key={reportKey} />
-      <p className="help" style={{ marginBottom: 14 }}>
+      {!cbOnly && <p className="help" style={{ marginBottom: 14 }}>
         Credits used today: <b className="num">{used}</b> of <span className="num">{settings?.daily_credit_cap ?? 90}</span>. A refresh costs 1 credit per 25 matches.
         {' '}<Link to="/admin/data" className="textlink" style={{ minHeight: 0, fontSize: 12.5 }}>Cricket data settings</Link>
-      </p>
+      </p>}
       <div className="seg" style={{ maxWidth: 520 }}>
         {(['Today', 'Tomorrow', 'Later', 'Live'] as const).map((t) => <button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}>{t}</button>)}
       </div>

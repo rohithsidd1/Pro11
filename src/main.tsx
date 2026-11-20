@@ -21,6 +21,26 @@ const updateSW = registerSW({
   },
 })
 
+// Belt and braces: if the live site is a newer build than this copy, drop every saved copy and reload once.
+async function freshness() {
+  if (!navigator.onLine) return
+  try {
+    const r = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' })
+    if (!r.ok) return
+    const { build } = (await r.json()) as { build?: string }
+    if (!build || build === __BUILD_TIME__ || new Date(build) < new Date(__BUILD_TIME__)) return
+    if (sessionStorage.getItem('pro11.reloadedFor') === build) return   // never loop
+    sessionStorage.setItem('pro11.reloadedFor', build)
+    const regs = (await navigator.serviceWorker?.getRegistrations?.()) ?? []
+    await Promise.all(regs.map((g) => g.update().catch(() => undefined)))
+    if ('caches' in window) await Promise.all((await caches.keys()).map((k) => caches.delete(k)))
+    window.location.reload()
+  } catch { /* offline or blocked: try again later */ }
+}
+void freshness()
+window.setInterval(() => void freshness(), 5 * 60 * 1000)
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void freshness() })
+
 const root = createRoot(document.getElementById('root')!)
 
 if (configError) {

@@ -52,30 +52,18 @@ async function schedule() {
 }
 
 /**
- * Scorecard + match info + squads/Playing XI for one match.
- * Cricbuzz's old HTML API first; then the current scorecard page (innings) and squads page (teams, Playing XI).
+ * One match: the current scorecard page (innings, toss, status) and squads page (squads with roles, Playing XI
+ * after the toss). Both work with just the match id. Checked against the real site, Nov 2026.
  */
-async function scorecardFor(id: string, slug?: string) {
-  const legacy = await get(`${WWW()}/api/html/cricket-scorecard/${id}`, 3000)
-  let sc = parseScorecard(legacy.html)
-  const tried = [report(legacy, sc.innings.length + sc.teams.length)]
-  if (slug && (!sc.teams.length || !sc.innings.length)) {
-    const [card, squads] = await Promise.all([
-      get(`${WWW()}/live-cricket-scorecard/${id}/${slug}`, 5000), get(`${WWW()}/cricket-match-squads/${id}/${slug}`, 5000),
-    ])
-    const fromCard = parseScorecard(card.html)
-    const inns = fromCard.innings.length && fromCard.innings.some((i) => i.bowling.length) ? fromCard.innings : inningsFromJson(card.html)
-    const teams = squadsFromJson(squads.html)
-    const head = { ...headerFromJson(squads.html), ...Object.fromEntries(Object.entries(headerFromJson(card.html)).filter(([, v]) => v)) }
-    tried.push(report(card, inns.length), report(squads, teams.reduce((n, t) => n + t.players.length, 0)))
-    if (!sc.innings.length && inns.length) sc.innings = inns
-    if (!sc.teams.length && teams.length) sc.teams = teams
-    if (!sc.status) sc.status = head.status ?? fromCard.status
-    if (!sc.toss && head.toss) sc.toss = head.toss
-    if (!sc.startsAt && head.startsAt) sc.startsAt = head.startsAt
-    sc.state = sc.state ?? head.state ?? fromCard.state
-  }
-  return { sc, sources: tried }
+async function scorecardFor(id: string, _slug?: string) {
+  const [card, squads] = await Promise.all([get(`${WWW()}/live-cricket-scorecard/${id}`, 6000), get(`${WWW()}/cricket-match-squads/${id}`, 6000)])
+  const fromCard = parseScorecard(card.html)
+  const innings = fromCard.innings.length && fromCard.innings.some((i) => i.bowling.length) ? fromCard.innings : inningsFromJson(card.html)
+  const teams = squadsFromJson(squads.html)
+  const head = { ...headerFromJson(squads.html), ...Object.fromEntries(Object.entries(headerFromJson(card.html)).filter(([, v]) => v)) }
+  const sc = { ...fromCard, innings, teams: teams.length ? teams : fromCard.teams, status: head.status ?? fromCard.status, toss: head.toss ?? fromCard.toss,
+    startsAt: head.startsAt ?? fromCard.startsAt, state: head.state ?? fromCard.state ?? (innings.length ? 'live' as const : undefined) }
+  return { sc, sources: [report(card, innings.length), report(squads, teams.reduce((n, t) => n + t.players.length, 0))] }
 }
 
 async function roles(players: { id: string; slug?: string }[], match?: { id: string; slug?: string }) {
@@ -120,11 +108,13 @@ export default async (req: Request) => {
       matchList: { total: l.matches.length, withStartTime: l.matches.filter((m) => m.startsAt).length, withTeams: l.matches.filter((m) => m.teamA).length, sources: l.sources,
         sample: l.matches.slice(0, 8).map((m) => `${m.id} ${m.teamA ?? m.teamAShort} v ${m.teamB ?? m.teamBShort} · ${m.desc ?? ''} · ${m.format} · ${m.state ?? '?'} · ${m.startsAt ?? 'no time'}`) },
     }
-    const pick = id ? { id, slug } : l.matches.find((m) => m.state === 'live') ?? l.matches.find((m) => m.state === 'ended') ?? l.matches[0]
+    const sch = await schedule()
+    out.schedules = { total: sch.matches.length, upcoming: sch.matches.filter((m) => m.state !== 'ended').length, sources: sch.sources }
+    const pick = id ? { id, slug } : l.matches.find((m) => m.state === 'upcoming') ?? l.matches.find((m) => m.state === 'live') ?? l.matches[0]
     if (pick) {
       const { sc, sources } = await scorecardFor(pick.id, pick.slug)
       out.scorecard = { match: pick.id, sources, status: sc.status, state: sc.state, startsAt: sc.startsAt, toss: sc.toss?.text, series: sc.series,
-        teams: sc.teams.map((t) => `${t.name}: ${t.players.filter((p) => p.group === 'playing').length} playing, ${t.players.length} in squad`),
+        teams: sc.teams.map((t) => `${t.name}: ${t.players.filter((p) => p.group === 'playing').length} playing, ${t.players.length} in squad, ${t.players.filter((p) => p.role).length} with roles`),
         innings: sc.innings.map((i) => `${i.team} ${i.score}: ${i.batting.length} batters, ${i.bowling.length} bowlers`) }
       const ps = sc.teams.flatMap((t) => t.players).slice(0, 4)
       const r = await roles(ps, pick)

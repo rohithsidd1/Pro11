@@ -511,7 +511,7 @@ Deno.serve(async (req) => {
         if (!mine?.length) return json({ error: 'Join the game first.' }, 403)
         return json({ ok: true, result: await cbManual(ctx, 'squad-for-entry', matchId) })
       }
-      if (caller.isAdmin && (matchId?.startsWith('cb-') || mode === 'list' || mode === 'fixtures')) {
+      if (caller.isAdmin && (matchId?.startsWith('cb-') || mode === 'list' || mode === 'fixtures' || mode === 'sync-now')) {
         const r = await cbManual(ctx, mode, matchId)
         if (r) return json({ ok: true, result: r })
       }
