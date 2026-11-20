@@ -193,7 +193,7 @@ async function applyInfo(ctx: CbCtx, matchId: string, sc: Any): Promise<{ player
 async function cbInfoPass(ctx: CbCtx, budget: number, force = false) {
   const now = Date.now()
   const { data: rows } = await ctx.db.from('matches')
-    .select('id, cb_slug, starts_at, cb_info_at, has_squad, category, is_women, visibility, series_id, xi_source')
+    .select('id, cb_slug, starts_at, cb_info_at, has_squad, category, is_women, visibility, series_id, xi_source, started')
     .like('id', 'cb-%').eq('ended', false)
     .gte('starts_at', new Date(now - 6 * 36e5).toISOString()).lte('starts_at', new Date(now + 10 * 864e5).toISOString())
     .order('starts_at').limit(300)
@@ -207,14 +207,16 @@ async function cbInfoPass(ctx: CbCtx, budget: number, force = false) {
     || (m.category !== 'international' && m.category !== 'league' && s.show_domestic)))
   const due = (rows ?? []).filter((m: Any) => {
     if (!visible(m)) return false
+    // matches already being played only matter if someone joined them (the live pass looks after those)
+    if (m.started && !withGames.has(m.id)) return false
     if (force) return true
     const hoursAway = (new Date(m.starts_at).getTime() - now) / 36e5
     const every = hoursAway < 2 && !m.xi_source ? 5 : !m.has_squad ? (hoursAway < 48 ? 15 : 120) : 360
     return minutesSince(m.cb_info_at) >= every - 0.5
   }).slice(0, budget)
   const out: Record<string, unknown> = {}
-  for (let i = 0; i < due.length; i += 4) {
-    await Promise.all(due.slice(i, i + 4).map(async (m: Any) => {
+  for (let i = 0; i < due.length; i += 8) {
+    await Promise.all(due.slice(i, i + 8).map(async (m: Any) => {
       const body = await cb(ctx, 'info', { id: m.id.slice(3) })
       if (!body) { await ctx.db.from('matches').update({ cb_info_at: isoNow() }).eq('id', m.id); return }
       out[m.id] = await applyInfo(ctx, m.id, body.scorecard)
@@ -305,7 +307,7 @@ export async function tickCricbuzz(ctx: CbCtx) {
   if (minutesSince(ctx.s.last_cb_schedule_at) >= (ctx.s.cb_schedule_hours ?? 12) * 60 - 1) out.schedule = await cbSchedule(ctx)
   const live = await cbLivePass(ctx, 4)
   if (Object.keys(live).length) out.live = live
-  const info = await cbInfoPass(ctx, 8)
+  const info = await cbInfoPass(ctx, 16)
   if (Object.keys(info).length) out.info = info
   const roles = await cbRoles(ctx, 1)
   if (roles.learned) out.roles = roles
@@ -319,7 +321,7 @@ export async function cbManual(ctx: CbCtx, mode: string, matchId: string | null)
     const list = await cbList(ctx)
     const schedule = await cbSchedule(ctx)
     const live = await cbLivePass(ctx, 6)
-    const info = await cbInfoPass(ctx, 24, true)
+    const info = await cbInfoPass(ctx, 40, true)
     await ctx.db.rpc('notify_squads_out')
     return { list, schedule, live: Object.keys(live).length, squadsChecked: Object.keys(info).length,
       message: `${list.found ?? 0} matches, ${Object.keys(info).length} squads checked, ${Object.keys(live).length} live updated` }
