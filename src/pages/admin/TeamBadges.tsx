@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { clearTeamCache } from '../../lib/teams'
 import { useToast } from '../../lib/toast'
 import { SkRows } from '../../components/Skeleton'
+import { smartFilter } from '../../lib/search'
 
 interface Team { key: string; name: string; short_name: string | null; img: string | null; custom_img: string | null }
 
@@ -43,7 +44,7 @@ export function TeamBadges() {
     if (error) return toast(errorText(error))
     clearTeamCache(); toast('Back to the default'); void load()
   }
-  const list = (teams ?? []).filter((t) => t.name.toLowerCase().includes(q.toLowerCase()))
+  const list = smartFilter(teams ?? [], q, (t) => [t.name, t.short_name])
   return (
     <Shell title="Team badges" back="/admin">
       <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = '' }} />

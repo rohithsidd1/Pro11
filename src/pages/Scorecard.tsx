@@ -59,7 +59,7 @@ export function Scorecard() {
           {!card ? (
             <div className="panel" style={{ background: 'var(--soft)' }}>
               <p className="rt">Full batting and bowling card</p>
-              <p className="rs">{match.ended ? 'Not fetched for this match. The admin can switch on “Full scorecard after the match” in Game rules (10 credits a match).' : 'Shown after the match if the admin has switched it on.'}</p>
+              <p className="rs">{match.ended ? 'Cricbuzz didn’t publish a scorecard for this match.' : 'The scorecard appears here once the match starts, updated every minute.'}</p>
             </div>
           ) : (
             <>

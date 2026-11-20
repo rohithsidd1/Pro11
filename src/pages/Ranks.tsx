@@ -6,6 +6,8 @@ import { useAuth } from '../lib/auth'
 import { rupees } from '../lib/money'
 import { supabase } from '../lib/supabase'
 import { SkScreen, SkSwap } from '../components/Skeleton'
+import { SearchBar, useQuery } from '../components/SearchBar'
+import { smartFilter } from '../lib/search'
 
 interface Row { user_id: string; name: string; color: string; played: number; won: number; winnings: number; spent: number; net: number; bonus: number }
 type Period = 'month' | 'year' | 'all'
@@ -31,8 +33,10 @@ export function Ranks() {
       .then(({ data }) => setRows((data as Row[] | null) ?? []))
   }, [period, game])
 
-  const active = (rows ?? []).filter((r) => r.played > 0).sort((a, b) => sortBy === 'bonus' ? b.bonus - a.bonus || b.net - a.net : 0)
-  const leader = active[0]
+  const ranked = (rows ?? []).filter((r) => r.played > 0).sort((a, b) => sortBy === 'bonus' ? b.bonus - a.bonus || b.net - a.net : 0)
+  const [rq, setRq] = useQuery('ranks')
+  const active = smartFilter(ranked, rq, (r) => [r.name])
+  const leader = rq ? undefined : ranked[0]
   return (
     <Shell title="Ranks" kicker={period === 'month' ? new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }) : period === 'year' ? new Date().toLocaleDateString('en-IN', { year: 'numeric', timeZone: 'Asia/Kolkata' }) : 'All time'}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', maxWidth: 720 }}>
@@ -48,13 +52,13 @@ export function Ranks() {
         </div>
       </div>
       {showBonus && (
-        <div className="seg sm" role="group" aria-label="Rank by" style={{ marginTop: 8, maxWidth: 360 }}>
+        <div className="seg" role="group" aria-label="Rank by" style={{ marginTop: 8, maxWidth: 720 }}>
           <button aria-pressed={sortBy === 'net'} onClick={() => setSortBy('net')}>By money</button>
           <button aria-pressed={sortBy === 'bonus'} onClick={() => setSortBy('bonus')}>By bonus points</button>
         </div>
       )}
       <SkSwap loading={!rows} skeleton={<div style={{ marginTop: 16, maxWidth: 720 }}><SkScreen rows={4} /></div>}>
-      {rows && active.length === 0 && <Empty icon="trophy" title="No finished games yet">Ranks fill in as games finish and pay out.</Empty>}
+      {rows && active.length === 0 && <Empty icon="trophy" title="No finished games yet">Ranks fill in as games finish.</Empty>}
       {leader && (
         <section className="chead" style={{ ['--c' as string]: 'var(--lemon)', marginTop: 16, maxWidth: 720, paddingBottom: 20 }}>
           <div className="score-hero">
@@ -67,9 +71,10 @@ export function Ranks() {
       )}
       {active.length > 0 && (
         <div className="list" style={{ marginTop: 12, maxWidth: 720 }}>
-          {active.map((r, i) => (
+          {ranked.length > 5 && <div className="search-wrap"><SearchBar value={rq} onChange={setRq} placeholder="Search players" label="Search ranks" /></div>}
+          {active.map((r) => (
             <div key={r.user_id} className={`rank-row${r.user_id === profile?.id ? ' me' : ''}`}>
-              <span className="pos">{i + 1}</span>
+              <span className="pos">{ranked.indexOf(r) + 1}</span>
               <Avatar name={r.name} color={r.color} />
               <span style={{ minWidth: 0 }}>
                 <span className="rt">{r.user_id === profile?.id ? 'You' : r.name}</span>
@@ -80,7 +85,7 @@ export function Ranks() {
           ))}
         </div>
       )}
-      <p className="fine" style={{ paddingLeft: 0, maxWidth: 720 }}>Net = money won minus entry fees, for finished games only. Cancelled games don’t count.{showBonus ? ' Bonus points are just for bragging: they never turn into money.' : ''}</p>
+      <p className="fine" style={{ paddingLeft: 0, maxWidth: 720 }}>Net = what others owe you minus what you owe, from finished games (the same amounts as Ledger). Cancelled games don’t count.{showBonus ? ' Bonus points are just for bragging: they never turn into money.' : ''}</p>
       </SkSwap>
     </Shell>
   )

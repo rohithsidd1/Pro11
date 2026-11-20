@@ -1,15 +1,27 @@
 import { Shell } from '../components/Shell'
 import { useAuth } from '../lib/auth'
+import { SearchBar, useQuery } from '../components/SearchBar'
+import { makeMatcher } from '../lib/search'
 
 export function Help() {
   const { settings } = useAuth()
   const s = (settings ?? {}) as Record<string, number | string | boolean>
   const n = (k: string, d: number) => Number(s[k] ?? d)
-  const Q = ({ q, children }: { q: string; children: React.ReactNode }) => (
-    <details className="panel faq"><summary className="rt">{q}</summary><div className="help" style={{ color: 'var(--ink)', marginTop: 8, lineHeight: 1.55 }}>{children}</div></details>
-  )
+  const [hq, setHq] = useQuery('help')
+  const match = makeMatcher(hq)
+  const textOf = (n: React.ReactNode): string => typeof n === 'string' || typeof n === 'number' ? String(n) : Array.isArray(n) ? n.map(textOf).join(' ')
+    : n && typeof n === 'object' && 'props' in n ? textOf((n as { props: { children?: React.ReactNode } }).props.children) : ''
+  let shownQ = 0
+  const Q = ({ q, children }: { q: string; children: React.ReactNode }) => {
+    if (match && !match([q, textOf(children)])) return null
+    shownQ++
+    return (
+    <details className="panel faq" open={!!match}><summary className="rt">{q}</summary><div className="help" style={{ color: 'var(--ink)', marginTop: 8, lineHeight: 1.55 }}>{children}</div></details>
+    )
+  }
   return (
     <Shell title="How Pro11 works" back="/me">
+      <div className="search-wrap" style={{ maxWidth: 760 }}><SearchBar value={hq} onChange={setHq} placeholder="Search help" label="Search help" /></div>
       <div style={{ display: 'grid', gap: 8, maxWidth: 760 }}>
         <Q q="How does money work?">There’s no wallet. Each game has an entry amount, which is just the stake: nothing is paid when you join. When the game finishes, everyone who lost owes the winner their entry (split equally if winners tie). Ledger shows, per person, who owes whom across all games, and your overall balance.</Q>
         <Q q="How do I settle up?">Ledger → the person → Settle up. Pay them however you like (UPI, cash), then tap “I paid”. It counts once they confirm. If they say they didn’t receive it, talk to them and record it again.</Q>

@@ -14,6 +14,8 @@ import { useToast } from '../../lib/toast'
 import type { Category, DataSettings, Match, Visibility } from '../../lib/types'
 import { filterMatches, useMatchFeed } from '../../lib/useMatches'
 import { SkRows } from '../../components/Skeleton'
+import { SearchBar, useQuery } from '../../components/SearchBar'
+import { smartFilter } from '../../lib/search'
 
 const CAT: Record<Category, string> = { international: 'International', league: 'League', domestic: 'Domestic', other: 'Other' }
 
@@ -32,7 +34,10 @@ export function AdminMatches() {
   const { matches, loading, reload } = useMatchFeed('matches')
   const [tab, setTab] = useState<'Today' | 'Tomorrow' | 'Later' | 'Live'>('Today')
   const [busy, setBusy] = useState(false)
-  const list = filterMatches(matches.filter((m) => m.id.startsWith('cb-')), tab, 'All', undefined, { liveAll: true })
+  const [aq, setAq] = useQuery('admin.matches')
+  const list = aq
+    ? smartFilter(matches.filter((m) => m.id.startsWith('cb-') && !m.ended), aq, (m) => [m.team_a, m.team_b, m.team_a_short, m.team_b_short, m.series_name, m.label, m.venue, m.format, m.category])
+    : filterMatches(matches.filter((m) => m.id.startsWith('cb-')), tab, 'All', undefined, { liveAll: true })
   const [blocked, setBlocked] = useState<Set<string>>(new Set())
   useEffect(() => { void supabase.from('blocked_series').select('series_id').then(({ data }) => setBlocked(new Set((data ?? []).map((r: { series_id: string }) => r.series_id)))) }, [])
 
@@ -56,6 +61,7 @@ export function AdminMatches() {
     <Shell title="Matches" back="/admin" kicker="What members see, and why"
       actions={<button className="btn sm primary" onClick={refresh} disabled={busy}>{busy ? <span className="spinner" /> : <Icon name="refresh" small />}<span>Refresh now</span></button>}>
       <MatchReport key={reportKey} />
+      <div className="search-wrap"><SearchBar value={aq} onChange={setAq} placeholder="Search matches by team, series or city" label="Search matches" /></div>
       <div className="seg" style={{ maxWidth: 520 }}>
         {(['Today', 'Tomorrow', 'Later', 'Live'] as const).map((t) => <button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}>{t}</button>)}
       </div>
@@ -82,8 +88,7 @@ export function AdminMatches() {
                 <span className={shown ? 'tag ok' : 'tag warn'}>{shown ? 'Shown' : 'Hidden'}</span>
                 {m.series_id && blocked.has(m.series_id) ? <span className="tag bad">League removed: no data</span>
                   : m.squad_fetched_at ? <span className="tag">Squads loaded</span>
-                  : m.fantasy_ok && m.has_squad ? <span className="tag ok">Game data</span>
-                  : <span className="tag warn">No game data</span>}
+                  : m.has_squad ? <span className="tag ok">Squads in</span> : <span className="tag">Squads soon</span>}
               </div>
               <Link className="btn sm" style={{ marginTop: 12 }} to={`/admin/match/${m.id}`}><Icon name="trophy" small /><span>Game status</span></Link>
               <div className="seg sm" style={{ marginTop: 12, maxWidth: 420 }} role="group" aria-label="Visibility">

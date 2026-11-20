@@ -14,12 +14,15 @@ import { useToast } from '../lib/toast'
 import type { Match, MatchPlayer } from '../lib/types'
 import { SkScreen } from '../components/Skeleton'
 import { useLiveReload, useNow } from '../lib/live'
+import { SearchBar, useQuery } from '../components/SearchBar'
+import { roleWords, smartFilter } from '../lib/search'
 
 const ROLE_LABEL: Record<MatchPlayer['role'], string> = { WK: 'Wicketkeeper', BAT: 'Batter', AR: 'All-rounder', BOWL: 'Bowler' }
 const ROLE_ORDER: MatchPlayer['role'][] = ['BAT', 'WK', 'AR', 'BOWL']
 
 export function MatchPage() {
   const { id = '' } = useParams()
+  const [sq, setSq] = useQuery(`squad.${id}`)
   const { isAdmin } = useAuth()
   const toast = useToast()
   const [m, setM] = useState<Match | null>(null)
@@ -117,11 +120,13 @@ export function MatchPage() {
 
           {isAdmin && (
             <>
-              <div className="sec"><h2>Admin</h2><span className="aside">1 credit</span></div>
+              <div className="sec"><h2>Admin</h2></div>
+              <div className="btn-row wrap" style={{ marginBottom: 8 }}>
               <button className="btn sm" disabled={!!busy} onClick={() => run('info')}>
                 {busy === 'info' ? <span className="spinner" /> : <Icon name="refresh" small />}<span>Refresh match</span>
               </button>
-              <a className="btn sm" style={{ marginLeft: 8 }} href={`/admin/match/${m.id}`}><Icon name="trophy" small /><span>Game status</span></a>
+              <a className="btn sm" href={`/admin/match/${m.id}`}><Icon name="trophy" small /><span>Game status</span></a>
+              </div>
             </>
           )}
         </div>
@@ -131,6 +136,8 @@ export function MatchPage() {
             <h2>Squads</h2>
             {players.length > 0 && <span className="aside"><span className="num">{players.length}</span> players</span>}
           </div>
+          {players.length > 0 && <div className="search-wrap"><SearchBar value={sq} onChange={setSq} placeholder="Search players" label="Search the squads" /></div>}
+          {sq && players.length > 0 && !players.some((p) => smartFilter([p], sq, (x) => [x.name, roleWords(x.role)]).length) && <p className="help">No player matches “{sq.trim()}”.</p>}
           {players.length === 0 ? (
             <div className="panel" style={{ background: 'var(--soft)' }}>
               <p className="rt">Squads aren’t loaded yet</p>
@@ -138,8 +145,8 @@ export function MatchPage() {
             </div>
           ) : (
             teams.map((t) => {
-              const list = players.filter((p) => p.team.toLowerCase() === t.toLowerCase())
-                .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.name.localeCompare(b.name))
+              const list = smartFilter(players.filter((p) => p.team.toLowerCase() === t.toLowerCase())
+                .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.name.localeCompare(b.name)), sq, (p) => [p.name, roleWords(p.role)])
               if (!list.length) return null
               return (
                 <section key={t} className="panel" style={{ marginBottom: 8 }}>

@@ -13,7 +13,7 @@ export function GeneralSettings() {
       <section className="panel" style={{ maxWidth: 640 }}>
         <div className="field"><label htmlFor="an">App name</label><div className="input"><input id="an" value={f.app_name} maxLength={30} onChange={(e) => set('app_name', e.target.value)} /></div></div>
         <div className="field"><label htmlFor="ad">Admin name</label><div className="input"><input id="ad" value={f.admin_name} maxLength={40} onChange={(e) => set('admin_name', e.target.value)} /></div>
-          <p className="help">Shown to members, for example “Pay Rohith”.</p></div>
+          <p className="help">Shown to members wherever the admin is mentioned.</p></div>
         <div className="rule stacked"><p className="k">Home opens on</p>
           <div className="seg sm"><button aria-pressed={f.home_tab === 'Today'} onClick={() => set('home_tab', 'Today')}>Today</button><button aria-pressed={f.home_tab === 'Mine'} onClick={() => set('home_tab', 'Mine')}>My games</button></div></div>
         <div className="rule"><p className="k">Time zone</p><span className="help">India (IST)</span></div>

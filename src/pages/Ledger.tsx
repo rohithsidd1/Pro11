@@ -11,11 +11,14 @@ import { istDayName, istTime } from '../lib/ist'
 import { money, useLedger, type Balance } from '../lib/useLedger'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
+import { SearchBar, useQuery } from '../components/SearchBar'
+import { smartFilter } from '../lib/search'
 
 /** Who owes whom, like Splitwise: my overall balance, then each person. */
 export function Ledger() {
   const toast = useToast()
   const { balances, incoming, error, reload, owedToMe, iOwe, total } = useLedger()
+  const [lq, setLq] = useQuery('ledger')
   const [paying, setPaying] = useState<Balance | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const decide = async (id: string, ok: boolean) => {
@@ -28,8 +31,9 @@ export function Ledger() {
 
   if (error) return <Shell title="Ledger"><Empty icon="alert" title="Couldn’t load the ledger" action={<button className="btn" onClick={() => void reload()}><span>Try again</span></button>}>{error}</Empty></Shell>
 
-  const people = (balances ?? []).filter((b) => Math.abs(b.net) >= 0.01 || b.waiting_out || b.waiting_in)
-  const settled = (balances ?? []).filter((b) => !people.includes(b))
+  const allPeople = (balances ?? []).filter((b) => Math.abs(b.net) >= 0.01 || b.waiting_out || b.waiting_in)
+  const people = smartFilter(allPeople, lq, (b) => [b.name])
+  const settled = (balances ?? []).filter((b) => !allPeople.includes(b))
   return (
     <Shell title="Ledger" kicker="Who owes whom">
       <SkSwap loading={!balances} skeleton={<SkScreen />}>{() => (<>
@@ -68,6 +72,8 @@ export function Ledger() {
 
         <div>
           <div className="sec" style={{ paddingTop: 0 }}><h2>People</h2><span className="aside">tap for history</span></div>
+          {allPeople.length > 3 && <div className="search-wrap" style={{ marginTop: 0 }}><SearchBar value={lq} onChange={setLq} placeholder="Search people" label="Search people" /></div>}
+          {lq && !people.length && <p className="help">Nobody matches “{lq.trim()}”.</p>}
           {people.length === 0 && <Empty icon="check" title="Nothing to settle">When a game finishes, who owes whom shows up here.</Empty>}
           <div className="list">
             {people.map((b) => (

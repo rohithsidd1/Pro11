@@ -48,10 +48,10 @@ export function MatchReport() {
     <section className="panel" style={{ marginBottom: 16 }}>
       <div className="ch"><h3>What members see, and why</h3><span className="help num">{all.length} matches</span></div>
       <p className="help" style={{ marginBottom: 10 }}>Every match Pro11 has from the last 3 days onwards. Uses exactly the same rules as the members’ list.</p>
-      <div className="chips" role="group" aria-label="Filter by reason" style={{ flexWrap: 'wrap', width: 'auto' }}>
-        <button className="chip" aria-pressed={filter === 'All'} onClick={() => setFilter('All')}>All <span className="num">{all.length}</span></button>
+      <div className="chips wrap" role="group" aria-label="Filter by reason">
+        <button className="chip" aria-pressed={filter === 'All'} onClick={() => setFilter('All')}>All<span className="count num">{all.length}</span></button>
         {summary.map((s) => (
-          <button key={s.reason} className="chip" aria-pressed={filter === s.reason} onClick={() => setFilter(s.reason)}>{s.reason} <span className="num">{s.n}</span></button>
+          <button key={s.reason} className="chip" aria-pressed={filter === s.reason} onClick={() => setFilter(s.reason)}>{s.reason}<span className="count num">{s.n}</span></button>
         ))}
       </div>
       <div className="list" style={{ marginTop: 12 }}>

@@ -5,6 +5,8 @@ import { Shell } from '../components/Shell'
 import { istDayName, istTime } from '../lib/ist'
 import { useNotifications, type Notice } from '../lib/useNotifications'
 import { SkRows, SkSwap } from '../components/Skeleton'
+import { SearchBar, useQuery } from '../components/SearchBar'
+import { smartFilter } from '../lib/search'
 
 const ICON: Record<string, [IconName, string]> = {
   contest_scored: ['trophy', 'var(--lemon)'], contest_paid: ['trophy', 'var(--mint)'],
@@ -16,15 +18,19 @@ const ICON: Record<string, [IconName, string]> = {
 
 export function Notifications() {
   const { items, unread, loading, markRead } = useNotifications()
+  const [nq, setNq] = useQuery('notifications')
+  const shownItems = smartFilter(items, nq, (n) => [n.title, n.body])
   const navigate = useNavigate()
   const open = (n: Notice) => { void markRead([n.id]); if (n.link) navigate(n.link) }
   return (
     <Shell title="Notifications" back="/" kicker={unread ? `${unread} unread` : 'All caught up'}
       actions={unread > 0 ? <button className="btn sm" onClick={() => markRead(items.filter((n) => !n.read_at).map((n) => n.id))}><Icon name="check" small /><span>Read all</span></button> : undefined}>
+      {items.length > 5 && <div className="search-wrap" style={{ maxWidth: 720 }}><SearchBar value={nq} onChange={setNq} placeholder="Search alerts" label="Search alerts" /></div>}
       <SkSwap loading={loading} skeleton={<SkRows n={6} />}>
+        {nq && !shownItems.length && <p className="help">No alert matches “{nq.trim()}”.</p>}
       {items.length === 0 && <Empty icon="bell" title="Nothing yet">Game results, alerts and payments to confirm show up here.</Empty>}
       <div className="list" style={{ maxWidth: 720 }}>
-        {items.map((n) => {
+        {shownItems.map((n) => {
           const [icon, bg] = ICON[n.kind] ?? ['bell', 'var(--soft)']
           return (
             <button key={n.id} className={`row notice${n.read_at ? '' : ' unread'}`} onClick={() => open(n)}>

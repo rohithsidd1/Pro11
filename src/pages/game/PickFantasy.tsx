@@ -15,12 +15,15 @@ import type { MatchPlayer } from '../../lib/types'
 import { ROLE_LABEL, ROLE_ORDER, ROLE_PLURAL, teamRules, useContest, useMatchAndSquad } from '../../lib/useGames'
 import { SkScreen } from '../../components/Skeleton'
 import { SavedSheet } from '../../components/SavedSheet'
+import { SearchBar, useQuery } from '../../components/SearchBar'
+import { roleWords, smartFilter } from '../../lib/search'
 
 type Role = MatchPlayer['role']
 const SHORT: Record<Role, string> = { WK: 'WK', BAT: 'BAT', AR: 'AR', BOWL: 'BOWL' }
 
 export function PickFantasy() {
   const { id = '' } = useParams()
+  const [fq, setFq] = useQuery(`pickfx.${id}`)
   const [saved, setSaved] = useState<{ title: string; detail: string } | null>(null)
   const toast = useToast()
   const { settings } = useAuth()
@@ -91,7 +94,7 @@ export function PickFantasy() {
     setSaved({ title: 'Team saved', detail: `11 players, with ${byId.get(cap)?.name ?? 'your captain'} as captain (${rules.captain}×) and ${byId.get(vice)?.name ?? 'your vice-captain'} as vice-captain (${rules.vice}×).` })
   }
 
-  const list = players.filter((p) => p.role === role).sort((a, b) => a.team.localeCompare(b.team) || a.name.localeCompare(b.name))
+  const list = smartFilter(players.filter((p) => p.role === role), fq, (p) => [p.name, p.team, roleWords(p.role)]).sort((a, b) => a.team.localeCompare(b.team) || a.name.localeCompare(b.name))
 
   return (
     <Shell title="Fantasy XI" kicker={open ? `Locks at ${istTime(contest.lock_at)}, in ${untilText(contest.lock_at)}` : 'Locked'} back={`/match/${id}`}
@@ -115,6 +118,7 @@ export function PickFantasy() {
               {teams.map((t) => <div key={t}><p className="k">{shortTeam(t)}</p><p className="v">{sideCount(t)}<span style={{ fontSize: 13, color: 'var(--muted)' }}>/{rules.maxPerSide}</span></p></div>)}
             </div>
             <div className="seg" role="group" aria-label="Role" style={{ marginTop: 12 }}>
+          <div className="search-wrap"><SearchBar value={fq} onChange={setFq} placeholder="Search players" label="Search players" /></div>
               {ROLE_ORDER.map((r) => (
                 <button key={r} aria-pressed={role === r} onClick={() => setRole(r)}>
                   {SHORT[r]} <span className="num" style={{ fontWeight: 500, fontSize: 12 }}>{roleCount(r)}</span>

@@ -13,9 +13,12 @@ import type { MatchPlayer } from '../../lib/types'
 import { ROLE_LABEL, ROLE_ORDER, ROLE_PLURAL, useContest, useMatchAndSquad } from '../../lib/useGames'
 import { SkScreen } from '../../components/Skeleton'
 import { SavedSheet } from '../../components/SavedSheet'
+import { SearchBar, useQuery } from '../../components/SearchBar'
+import { roleWords, smartFilter } from '../../lib/search'
 
 export function PickXi() {
   const { id = '' } = useParams()
+  const [pq, setPq] = useQuery(`pickxi.${id}`)
   const [saved, setSaved] = useState<{ title: string; detail: string } | null>(null)
   const toast = useToast()
   const { match, players, loading: l1, reload: reloadSquad } = useMatchAndSquad(id)
@@ -51,7 +54,7 @@ export function PickXi() {
   const countFor = (t: string) => (byTeam.get(t) ?? []).filter((p) => picked.has(p.player_id)).length
   const total = teams.reduce((s, t) => s + countFor(t), 0)
   const current = team ?? match.team_a
-  const list = byTeam.get(current) ?? []
+  const list = smartFilter(byTeam.get(current) ?? [], pq, (p) => [p.name, roleWords(p.role)])
   const full = countFor(current) >= 11
 
   const toggle = (p: MatchPlayer) => {
@@ -91,6 +94,8 @@ export function PickXi() {
             ))}
           </div>
           {!open && <p className="help" style={{ marginTop: 12 }}>Picks are locked. This is what you picked.</p>}
+          <div className="search-wrap"><SearchBar value={pq} onChange={setPq} placeholder="Search players" label="Search players" /></div>
+          {pq && !list.length && <p className="help">No player in this squad matches “{pq.trim()}”.</p>}
           {ROLE_ORDER.map((role) => {
             const group = list.filter((p) => p.role === role)
             if (!group.length) return null

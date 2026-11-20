@@ -12,6 +12,8 @@ import { dayLabel } from '../../lib/time'
 import { useToast } from '../../lib/toast'
 import type { Profile } from '../../lib/types'
 import { SkRows } from '../../components/Skeleton'
+import { SearchBar } from '../../components/SearchBar'
+import { smartFilter } from '../../lib/search'
 
 export function Members() {
   const { profile: me } = useAuth()
@@ -39,8 +41,7 @@ export function Members() {
     toast(done); void load()
   }
 
-  const q = query.trim().toLowerCase()
-  const shown = people.filter((p) => !q || p.name.toLowerCase().includes(q) || p.phone.includes(q.replace(/\D/g, '')))
+  const shown = smartFilter(people, query, (p) => [p.name, p.phone, p.role])
 
   return (
     <Shell title="Members" back="/admin" kicker={`${people.length} people`} actions={<button className="btn sm primary" onClick={() => setAdding((a) => !a)}><Icon name="plus" small /><span>Add member</span></button>}>
@@ -58,10 +59,7 @@ export function Members() {
           </div>
         </section>
       )}
-      <div className="input" style={{ marginBottom: 16, maxWidth: 520 }}>
-        <svg className="i" aria-hidden="true"><use href="#i-search" /></svg>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or phone" aria-label="Search members" />
-      </div>
+      <div className="search-wrap" style={{ maxWidth: 520 }}><SearchBar value={query} onChange={setQuery} placeholder="Search by name or phone" label="Search members" /></div>
       <div className="list">
         {shown.map((p) => {
           const isMe = p.id === me?.id

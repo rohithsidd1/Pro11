@@ -4,6 +4,8 @@ import { Shell } from '../../components/Shell'
 import { istDayName, istTime } from '../../lib/ist'
 import { supabase } from '../../lib/supabase'
 import { SkRows } from '../../components/Skeleton'
+import { SearchBar, useQuery } from '../../components/SearchBar'
+import { smartFilter } from '../../lib/search'
 
 interface Row { id: number; actor_id: string | null; area: string; action: string; detail: Record<string, unknown>; created_at: string; who: { name: string } | null }
 const AREAS = ['all', 'money', 'games', 'members', 'matches', 'settings', 'auto'] as const
@@ -18,6 +20,7 @@ const NICE: Record<string, string> = {
 
 /** Every money movement, game decision and settings change, newest first. */
 export function ActivityLog() {
+  const [lq, setLq] = useQuery('activity')
   const [area, setArea] = useState<(typeof AREAS)[number]>('all')
   const [rows, setRows] = useState<Row[] | null>(null)
   useEffect(() => {
@@ -33,13 +36,14 @@ export function ActivityLog() {
   }
   return (
     <Shell title="Activity log" back="/admin">
-      <div className="chips" role="group" aria-label="Area" style={{ width: 'fit-content', maxWidth: '100%' }}>
+      <div className="search-wrap"><SearchBar value={lq} onChange={setLq} placeholder="Search the log (who, what, match)" label="Search the activity log" /></div>
+      <div className="chips wrap" role="group" aria-label="Area">
         {AREAS.map((a) => <button key={a} className="chip" aria-pressed={area === a} onClick={() => setArea(a)}>{a === 'all' ? 'All' : a === 'auto' ? 'Automatic' : a[0].toUpperCase() + a.slice(1)}</button>)}
       </div>
       {!rows && <div style={{ marginTop: 12 }}><SkRows n={6} avatar={false} /></div>}
       {rows && rows.length === 0 && <Empty icon="log" title="Nothing here yet" />}
       <div className="list" style={{ marginTop: 12, maxWidth: 820 }}>
-        {(rows ?? []).map((r) => (
+        {smartFilter(rows ?? [], lq, (r) => [NICE[(r as { action: string }).action] ?? (r as { action: string }).action, JSON.stringify(r)]).map((r) => (
           <div key={r.id} className="row nolead" style={{ gridTemplateColumns: '1fr auto' }}>
             <span style={{ minWidth: 0 }}>
               <span className="rt">{OLD_WALLET.has(r.action) ? 'Wallet (removed)' : NICE[r.action] ?? r.action.replace(/_/g, ' ')}</span>

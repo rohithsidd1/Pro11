@@ -75,12 +75,12 @@ function GamePanel({ match, players, game }: { match: Match; players: MatchPlaye
     { done: players.length > 0, title: players.length ? `Squads loaded, ${players.length} players` : 'Squads load when the first person joins',
       sub: 'From Cricbuzz, as soon as it publishes them.' },
     ...(game === 'xi'
-      ? [{ done: xiDone, title: xiDone ? 'Playing XI in, game scored' : 'Playing XI', sub: 'From Cricbuzz at the toss, or from the final scorecard. Neither: refunded.' }]
+      ? [{ done: xiDone, title: xiDone ? 'Playing XI in, game scored' : 'Playing XI', sub: 'From Cricbuzz at the toss, or from the final scorecard. Neither: cancelled, nobody owes anything.' }]
       : [
-          { done: Boolean(contest.live_at), title: contest.live_at ? `Live points at ${istTime(contest.live_at)}` : 'Live points around the innings break', sub: 'One update during the match (if on in Game rules).' },
+          { done: Boolean(contest.live_at), title: contest.live_at ? `Live points at ${istTime(contest.live_at)}` : 'Live points during the match', sub: 'Updated every minute from the Cricbuzz scorecard.' },
           { done: scored, title: scored ? 'Final points in' : 'Final points when the match ends', sub: 'Abandoned or no result: cancelled, nobody owes anything.' },
         ]),
-    { done: contest.status === 'paid', title: contest.status === 'paid' ? 'Paid out' : payAt ? `Pays out at ${istTime(payAt)}` : 'Pays out 30 minutes after final scoring', sub: 'Winner takes the pot; ties split equally.' },
+    { done: contest.status === 'paid', title: contest.status === 'paid' ? 'Final, in Ledger' : payAt ? `Final at ${istTime(payAt)}` : 'Final 30 minutes after the last scores', sub: 'Losers owe the winner their entry; tied winners share it.' },
   ]
   const cancel = async () => {
     setBusy(true)
