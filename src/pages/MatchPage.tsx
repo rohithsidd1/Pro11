@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import type { Match, MatchPlayer } from '../lib/types'
 import { SkScreen } from '../components/Skeleton'
+import { useLiveReload, useNow } from '../lib/live'
 
 const ROLE_LABEL: Record<MatchPlayer['role'], string> = { WK: 'Wicketkeeper', BAT: 'Batter', AR: 'All-rounder', BOWL: 'Bowler' }
 const ROLE_ORDER: MatchPlayer['role'][] = ['BAT', 'WK', 'AR', 'BOWL']
@@ -26,6 +27,7 @@ export function MatchPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
 
+  useNow(30000)
   const load = useCallback(async () => {
     const [mr, pr] = await Promise.all([
       supabase.from('matches').select('*').eq('id', id).maybeSingle(),
@@ -35,6 +37,7 @@ export function MatchPage() {
     setPlayers((pr.data as MatchPlayer[] | null) ?? [])
     setLoading(false)
   }, [id])
+  useLiveReload(['matches', 'contests', 'entries'], load)
   useEffect(() => { void load() }, [load])
   // while the match is being played, re-read it every minute (the server updates the score; no extra credits here)
   useEffect(() => {
@@ -102,7 +105,7 @@ export function MatchPage() {
                 <p className="toss-t">{live ? 'In play' : m.ended ? 'Finished' : tossLine ? 'Toss done' : <>Toss around <span className="num">{istTime(new Date(new Date(m.starts_at).getTime() - 30 * 60000).toISOString())}</span></>}</p>
                 <p className="toss-s">{tossLine ?? (live || m.ended ? m.status_text : <>Starts at <span className="num">{istTime(m.starts_at)}</span></>)}</p>
               </div>
-              {!m.started && !m.ended && <span className="count num">{untilText(m.starts_at)}</span>}
+              {!m.started && !m.ended && <span className="count num">{new Date(m.starts_at).getTime() > Date.now() ? untilText(m.starts_at) : 'Toss soon'}</span>}
             </div>
           </section>
 

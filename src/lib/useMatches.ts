@@ -3,6 +3,7 @@ import { istDayStart } from './ist'
 import { supabase } from './supabase'
 import type { Match } from './types'
 import { useAuth } from './auth'
+import { useLiveReload, useLiveVersion } from './live'
 
 /** Upcoming matches (no end date) plus recent ones, from the member's feed. Re-reads every minute (no API cost). */
 export function useMatchFeed(source: 'match_feed' | 'matches' = 'match_feed') {
@@ -17,6 +18,7 @@ export function useMatchFeed(source: 'match_feed' | 'matches' = 'match_feed') {
     else { setMatches((data as Match[] | null) ?? []); setError(null) }
     setLoading(false)
   }, [source])
+  useLiveReload(['matches', 'contests', 'entries'], load)
   useEffect(() => {
     void load()
     const tick = () => { if (document.visibilityState === 'visible') void load() }
@@ -34,6 +36,7 @@ export function useGamesFor(matchIds: string[]) {
   const { profile } = useAuth()
   const [info, setInfo] = useState<Map<string, GameInfo>>(new Map())
   const key = matchIds.join(',')
+  const v = useLiveVersion(['contests', 'entries'])
   useEffect(() => {
     if (!matchIds.length) { setInfo(new Map()); return }
     let alive = true
@@ -51,7 +54,7 @@ export function useGamesFor(matchIds: string[]) {
     })
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, profile?.id])
+  }, [key, profile?.id, v])
   return info
 }
 

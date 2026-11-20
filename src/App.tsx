@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { type ComponentType, lazy, Suspense, useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAdmin, RequireAuth, SignedOutOnly } from './components/Guards'
 import { EnterCode } from './pages/auth/EnterCode'
@@ -8,40 +8,57 @@ import { Welcome } from './pages/auth/Welcome'
 import { Home } from './pages/Home'
 import { MatchPage } from './pages/MatchPage'
 import { SkScreen } from './components/Skeleton'
+import { Shell } from './components/Shell'
+import { useAuth } from './lib/auth'
+import { startLiveUpdates, stopLiveUpdates } from './lib/live'
 
 // Screens most people rarely open load on demand, so the app starts faster on phones.
-const AdminHome = lazy(() => import('./pages/admin/AdminHome').then((m) => ({ default: m.AdminHome })))
-const AdminMatches = lazy(() => import('./pages/admin/AdminMatches').then((m) => ({ default: m.AdminMatches })))
-const DataSync = lazy(() => import('./pages/admin/DataSync').then((m) => ({ default: m.DataSync })))
-const Members = lazy(() => import('./pages/admin/Members').then((m) => ({ default: m.Members })))
-const SignInCodes = lazy(() => import('./pages/admin/SignInCodes').then((m) => ({ default: m.SignInCodes })))
-const Notifications = lazy(() => import('./pages/Notifications').then((m) => ({ default: m.Notifications })))
-const Ledger = lazy(() => import('./pages/Ledger').then((m) => ({ default: m.Ledger })))
-const LedgerPerson = lazy(() => import('./pages/LedgerPerson').then((m) => ({ default: m.LedgerPerson })))
-const AdminLedger = lazy(() => import('./pages/admin/AdminLedger').then((m) => ({ default: m.AdminLedger })))
-const Ranks = lazy(() => import('./pages/Ranks').then((m) => ({ default: m.Ranks })))
-const Help = lazy(() => import('./pages/Help').then((m) => ({ default: m.Help })))
-const AlertsSetup = lazy(() => import('./pages/AlertsSetup').then((m) => ({ default: m.AlertsSetup })))
-const Install = lazy(() => import('./pages/Install').then((m) => ({ default: m.Install })))
-const Scorecard = lazy(() => import('./pages/Scorecard').then((m) => ({ default: m.Scorecard })))
-const NotificationSettings = lazy(() => import('./pages/admin/NotificationSettings').then((m) => ({ default: m.NotificationSettings })))
-const GeneralSettings = lazy(() => import('./pages/admin/GeneralSettings').then((m) => ({ default: m.GeneralSettings })))
-const Appearance = lazy(() => import('./pages/admin/Appearance').then((m) => ({ default: m.Appearance })))
-const TeamBadges = lazy(() => import('./pages/admin/TeamBadges').then((m) => ({ default: m.TeamBadges })))
-const ActivityLog = lazy(() => import('./pages/admin/ActivityLog').then((m) => ({ default: m.ActivityLog })))
-const SignInSettings = lazy(() => import('./pages/admin/SignInSettings').then((m) => ({ default: m.SignInSettings })))
-const Backup = lazy(() => import('./pages/admin/Backup').then((m) => ({ default: m.Backup })))
-const PickXi = lazy(() => import('./pages/game/PickXi').then((m) => ({ default: m.PickXi })))
-const XiResults = lazy(() => import('./pages/game/XiResults').then((m) => ({ default: m.XiResults })))
-const PickFantasy = lazy(() => import('./pages/game/PickFantasy').then((m) => ({ default: m.PickFantasy })))
-const FantasyResults = lazy(() => import('./pages/game/FantasyResults').then((m) => ({ default: m.FantasyResults })))
-const MatchControl = lazy(() => import('./pages/admin/MatchControl').then((m) => ({ default: m.MatchControl })))
-const GameRules = lazy(() => import('./pages/admin/GameRules').then((m) => ({ default: m.GameRules })))
-const Profile = lazy(() => import('./pages/Profile').then((m) => ({ default: m.Profile })))
+/** Lazy screens, remembered so they can all be fetched in the background after sign-in. */
+const loaders: (() => Promise<unknown>)[] = []
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function page<T extends ComponentType<any>>(load: () => Promise<{ default: T }>) { loaders.push(load); return lazy(load) }
+
+const AdminHome = page(() => import('./pages/admin/AdminHome').then((m) => ({ default: m.AdminHome })))
+const AdminMatches = page(() => import('./pages/admin/AdminMatches').then((m) => ({ default: m.AdminMatches })))
+const DataSync = page(() => import('./pages/admin/DataSync').then((m) => ({ default: m.DataSync })))
+const Members = page(() => import('./pages/admin/Members').then((m) => ({ default: m.Members })))
+const SignInCodes = page(() => import('./pages/admin/SignInCodes').then((m) => ({ default: m.SignInCodes })))
+const Notifications = page(() => import('./pages/Notifications').then((m) => ({ default: m.Notifications })))
+const Ledger = page(() => import('./pages/Ledger').then((m) => ({ default: m.Ledger })))
+const LedgerPerson = page(() => import('./pages/LedgerPerson').then((m) => ({ default: m.LedgerPerson })))
+const AdminLedger = page(() => import('./pages/admin/AdminLedger').then((m) => ({ default: m.AdminLedger })))
+const Ranks = page(() => import('./pages/Ranks').then((m) => ({ default: m.Ranks })))
+const Help = page(() => import('./pages/Help').then((m) => ({ default: m.Help })))
+const AlertsSetup = page(() => import('./pages/AlertsSetup').then((m) => ({ default: m.AlertsSetup })))
+const Install = page(() => import('./pages/Install').then((m) => ({ default: m.Install })))
+const Scorecard = page(() => import('./pages/Scorecard').then((m) => ({ default: m.Scorecard })))
+const NotificationSettings = page(() => import('./pages/admin/NotificationSettings').then((m) => ({ default: m.NotificationSettings })))
+const GeneralSettings = page(() => import('./pages/admin/GeneralSettings').then((m) => ({ default: m.GeneralSettings })))
+const Appearance = page(() => import('./pages/admin/Appearance').then((m) => ({ default: m.Appearance })))
+const TeamBadges = page(() => import('./pages/admin/TeamBadges').then((m) => ({ default: m.TeamBadges })))
+const ActivityLog = page(() => import('./pages/admin/ActivityLog').then((m) => ({ default: m.ActivityLog })))
+const SignInSettings = page(() => import('./pages/admin/SignInSettings').then((m) => ({ default: m.SignInSettings })))
+const Backup = page(() => import('./pages/admin/Backup').then((m) => ({ default: m.Backup })))
+const PickXi = page(() => import('./pages/game/PickXi').then((m) => ({ default: m.PickXi })))
+const XiResults = page(() => import('./pages/game/XiResults').then((m) => ({ default: m.XiResults })))
+const PickFantasy = page(() => import('./pages/game/PickFantasy').then((m) => ({ default: m.PickFantasy })))
+const FantasyResults = page(() => import('./pages/game/FantasyResults').then((m) => ({ default: m.FantasyResults })))
+const MatchControl = page(() => import('./pages/admin/MatchControl').then((m) => ({ default: m.MatchControl })))
+const GameRules = page(() => import('./pages/admin/GameRules').then((m) => ({ default: m.GameRules })))
+const Profile = page(() => import('./pages/Profile').then((m) => ({ default: m.Profile })))
 
 export default function App() {
+  const { status } = useAuth()
+  useEffect(() => {
+    if (status !== 'signed-in') return
+    startLiveUpdates()
+    // fetch every screen's code once things are quiet, so moving between screens never waits
+    const t = window.setTimeout(() => { for (const l of loaders) void l().catch(() => undefined) }, 1500)
+    return () => { window.clearTimeout(t); stopLiveUpdates() }
+  }, [status])
+
   return (
-    <Suspense fallback={<div className="route-loading"><SkScreen /></div>}>
+    <Suspense fallback={<Shell title="" kicker=" "><SkScreen /></Shell>}>
     <Routes>
       <Route path="/welcome" element={<SignedOutOnly><Welcome /></SignedOutOnly>} />
       <Route path="/sign-in" element={<SignedOutOnly><SignIn /></SignedOutOnly>} />

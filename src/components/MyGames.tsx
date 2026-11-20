@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { Empty } from './Empty'
 import { Icon } from './Icon'
 import { SkRows } from './Skeleton'
+import { useLiveVersion } from '../lib/live'
 
 interface Row {
   id: string; points: number; rank: number | null; payout: number; created_at: string
@@ -19,13 +20,14 @@ const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : n 
 export function MyGames() {
   const { profile } = useAuth()
   const [rows, setRows] = useState<Row[] | null>(null)
+  const v = useLiveVersion(['entries', 'contests'])
   useEffect(() => {
     if (!profile) return
     void supabase.from('entries')
       .select('id, points, rank, payout, created_at, contests!inner(game, status, fee, match_id, matches!inner(team_a, team_b, team_a_short, team_b_short, starts_at))')
       .eq('user_id', profile.id).order('created_at', { ascending: false }).limit(30)
       .then(({ data }) => setRows((data as unknown as Row[] | null) ?? []))
-  }, [profile])
+  }, [profile, v])
   if (!rows) return <SkRows n={3} />
   if (!rows.length) return <Empty icon="trophy" title="No games yet" action={<Link className="btn" to="/"><span>Find a match</span></Link>}>Join a game from any match with squads out.</Empty>
   return (

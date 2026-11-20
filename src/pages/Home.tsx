@@ -11,6 +11,7 @@ import { useAuth } from '../lib/auth'
 import { CARD_COLORS } from '../lib/cricket'
 import { filterMatches, useGamesFor, useMatchFeed, type DayTab, type FormatChip } from '../lib/useMatches'
 import { Sk, SkCards } from '../components/Skeleton'
+import { useNow } from '../lib/live'
 
 const TAB_LABEL: Record<DayTab, string> = { Today: 'Today', Tomorrow: 'Tomorrow', Later: 'Later', Live: 'Live', Mine: 'My games' }
 const CHIPS: FormatChip[] = ['All', 'T20', 'ODI', 'Test', 'Women']
@@ -22,6 +23,7 @@ export function Home() {
   const navigate = useNavigate()
   useEffect(() => { if (!pushAsked() && pushPermission() === 'default') navigate('/alerts') }, [navigate])
   const { matches, loading, error, reload } = useMatchFeed('match_feed')
+  useNow(30000)
   const { balances, total } = useLedger()
   const location = useLocation()
   const [tab, setTab] = useState<DayTab>((location.state as { tab?: DayTab } | null)?.tab ?? (cfg.home_tab === 'Mine' ? 'Mine' : 'Today'))

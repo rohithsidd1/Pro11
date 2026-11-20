@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from './auth'
 import { supabase } from './supabase'
 import type { Contest, Entry, FantasyPick, GameKind, Match, MatchPlayer, PlayerPoints, XiPick } from './types'
+import { useLiveReload, useLiveVersion } from './live'
 
 /** One match's contest for a game: the contest (created on first look), everyone who joined, your entry and your picks. */
 export function useContest(matchId: string, game: GameKind) {
@@ -36,6 +37,7 @@ export function useContest(matchId: string, game: GameKind) {
     else setTeam(((pk.data as (FantasyPick & { entries?: unknown })[] | null) ?? []).map(({ entry_id, player_id, team, role, captain, vice }) => ({ entry_id, player_id, team, role, captain, vice })))
     setError(null); setLoading(false)
   }, [matchId, game])
+  useLiveReload(['contests', 'entries', 'xi_picks', 'fantasy_picks'], load)
 
   useEffect(() => {
     void load()
@@ -64,6 +66,7 @@ export function useMatchAndSquad(matchId: string) {
     setPlayers((p.data as MatchPlayer[] | null) ?? [])
     setLoading(false)
   }, [matchId])
+  useLiveReload(['matches', 'match_players'], load)
   useEffect(() => { void load() }, [load])
   return { match, players, loading, reload: load }
 }
@@ -93,13 +96,14 @@ export function contestSummary(c: Contest | null, joined: number, minPlayers: nu
 /** Fantasy points per player for a match (live or final). */
 export function usePlayerPoints(matchId: string) {
   const [points, setPoints] = useState<Map<string, PlayerPoints>>(new Map())
+  const v = useLiveVersion(['player_points'])
   useEffect(() => {
     const load = () => supabase.from('player_points').select('*').eq('match_id', matchId)
       .then(({ data }) => setPoints(new Map(((data as PlayerPoints[] | null) ?? []).map((p) => [p.player_id, p]))))
     void load()
     const t = window.setInterval(() => { if (document.visibilityState === 'visible') void load() }, 60000)
     return () => window.clearInterval(t)
-  }, [matchId])
+  }, [matchId, v])
   return points
 }
 

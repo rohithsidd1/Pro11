@@ -13,7 +13,11 @@ function statusPills(m: Match): string[] {
     const parts = [a && `${m.team_a_short ?? shortTeam(m.team_a)} ${scoreText(a)}`, b && `${m.team_b_short ?? shortTeam(m.team_b)} ${scoreText(b)}`].filter(Boolean) as string[]
     return parts.length ? parts : [m.status_text || 'In play']
   }
-  return [`Starts in ${untilText(m.starts_at)}`]
+  // not live yet: the toss result if Cricbuzz has it, and never "Starts in 0m" once the time has passed
+  const s = (m.status_text ?? '').trim()
+  const toss = /opt to|won the toss|elected to/i.test(s)
+  if (new Date(m.starts_at).getTime() <= Date.now()) return [toss ? s : 'Starting · waiting for the toss']
+  return toss ? [s, `Starts in ${untilText(m.starts_at)}`] : [`Starts in ${untilText(m.starts_at)}`]
 }
 
 export function MatchCard({ m, color, games }: { m: Match; color: string; games?: GameInfo }) {

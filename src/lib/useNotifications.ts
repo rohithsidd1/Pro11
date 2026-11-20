@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from './auth'
 import { supabase } from './supabase'
+import { useLiveReload } from './live'
 
 export interface Notice { id: string; kind: string; title: string; body: string | null; link: string | null; read_at: string | null; created_at: string }
 
@@ -14,6 +15,7 @@ export function useNotifications(limit = 60) {
     const { data } = await supabase.from('notifications').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(limit)
     setItems((data as Notice[] | null) ?? []); setLoading(false)
   }, [profile, limit])
+  useLiveReload(['notifications'], load)
   useEffect(() => {
     void load()
     const tick = () => { if (document.visibilityState === 'visible') void load() }

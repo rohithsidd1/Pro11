@@ -559,11 +559,6 @@ body.plain-cards .stack.grid { padding-top: 0; }
 .split-i b { font-family: var(--text); font-weight: 700; }
 
 /* skeletons with shimmer */
-.sk { display: inline-block; background: linear-gradient(90deg, rgba(26,23,20,.07) 0%, rgba(26,23,20,.14) 40%, rgba(26,23,20,.07) 80%); background-size: 300% 100%; animation: sk-shimmer 1.3s ease-in-out infinite; vertical-align: middle; }
-.sk-card { background: var(--paper); border-radius: var(--r-lg); padding: 18px; }
-.sk-row { background: var(--paper) !important; }
-@keyframes sk-shimmer { 0% { background-position: 100% 0 } 100% { background-position: -100% 0 } }
-@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
 /* ledger */
 .bal-hero { border-radius: var(--r-lg); padding: 22px; border: 1.5px solid var(--ink); }
 .bal-hero.pos { background: var(--mint); } .bal-hero.neg { background: #FFD9CC; } .bal-hero.zero { background: var(--lemon); }
@@ -596,3 +591,22 @@ body.plain-cards .stack.grid { padding-top: 0; }
 .journey li.done { color: var(--ink); } .journey li.done .dot { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .journey li.now { color: var(--ink); font-weight: 600; } .journey li.now .dot { border-color: var(--ink); box-shadow: 0 0 0 4px var(--lemon); }
 .journey .jt { line-height: 22px; } .journey .js { color: var(--muted); font-weight: 400; }
+
+/* skeletons: a quiet base with a soft light sweep; they only appear if loading takes more than ~0.2 s */
+:root { --sk-card: #F7E4C0; }
+.sk { display: inline-block; position: relative; overflow: hidden; background: rgba(26,23,20,.08); vertical-align: middle; }
+.sk::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  animation: sk-sweep 1.6s ease-in-out infinite; }
+@keyframes sk-sweep { 100% { transform: translateX(100%) } }
+.sk-delay { animation: sk-in .2s ease .2s both; }
+@keyframes sk-in { from { opacity: 0 } to { opacity: 1 } }
+.sk-card { background: var(--paper); border-radius: var(--r-lg); padding: 18px; }
+.sk-row { background: var(--paper) !important; }
+.sk-cardx .tab, .sk-cardx .card-link { pointer-events: none; }
+/* inside a skeleton card the placeholders stack like the real card's parts (no text line spacing) */
+.sk-cardx .time .sk, .sk-cardx .team .sk, .sk-cardx .venue .sk { display: block; }
+.sk-cardx .badge { background: none !important; border: 0 !important; box-shadow: none !important; width: auto; height: auto; }
+.sk-cardx .tn, .sk-cardx .v { line-height: 0; }
+.sk-cardx .venue .sk { margin-left: auto; }
+@media (prefers-reduced-motion: reduce) { .sk::after { animation: none; } .sk-delay { animation: none; } }

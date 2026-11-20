@@ -191,7 +191,7 @@ async function applyInfo(ctx: CbCtx, matchId: string, sc: Any): Promise<{ player
 
 /**
  * Upcoming matches members can see (or that have games): squads with roles, toss, Playing XI.
- * Within 2 hours of the start: every 5 minutes (to catch the toss and Playing XI). Squads not out yet:
+ * From 30 minutes before the start until it's live: every minute. Within 2 hours: every 5 minutes. Squads not out yet:
  * every 15 minutes (48 h ahead) or 2 hours (later). Squads already loaded and more than 2 hours away: every 6 hours.
  */
 async function cbInfoPass(ctx: CbCtx, budget: number, force = false) {
@@ -215,7 +215,8 @@ async function cbInfoPass(ctx: CbCtx, budget: number, force = false) {
     if (m.started && !withGames.has(m.id)) return false
     if (force) return true
     const hoursAway = (new Date(m.starts_at).getTime() - now) / 36e5
-    const every = hoursAway < 2 && !m.xi_source ? 5 : !m.has_squad ? (hoursAway < 48 ? 15 : 120) : 360
+    // from 30 minutes before the start until Cricbuzz marks it live: every minute (toss, Playing XI, start)
+    const every = hoursAway < 0.5 && !m.started ? 1 : hoursAway < 2 && !m.xi_source ? 5 : !m.has_squad ? (hoursAway < 48 ? 15 : 120) : 360
     return minutesSince(m.cb_info_at) >= every - 0.5
   }).slice(0, budget)
   const out: Record<string, unknown> = {}

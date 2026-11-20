@@ -5,7 +5,7 @@ export function Sk({ w = '100%', h = 14, r = 8, style }: { w?: number | string; 
 
 export function SkRows({ n = 4, avatar = true }: { n?: number; avatar?: boolean }) {
   return (
-    <div className="list" role="status" aria-label="Loading">
+    <div className="list sk-delay" role="status" aria-label="Loading">
       {Array.from({ length: n }, (_, i) => (
         <div key={i} className="row sk-row" style={{ gridTemplateColumns: avatar ? '44px 1fr auto' : '1fr auto' }}>
           {avatar && <Sk w={40} h={40} r={20} />}
@@ -17,25 +17,36 @@ export function SkRows({ n = 4, avatar = true }: { n?: number; avatar?: boolean 
   )
 }
 
+/** Match cards while they load: the real card's own markup and styles, so nothing moves when the data arrives. */
 export function SkCards({ n = 4 }: { n?: number }) {
   return (
-    <div className="stack grid" role="status" aria-label="Loading matches">
+    <ol className="stack grid sk-delay" role="status" aria-label="Loading matches">
       {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="sk-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><Sk w={90} h={12} /><Sk w={46} h={12} /></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 16, alignItems: 'center', marginTop: 18 }}>
-            <Sk w={64} h={30} /><span style={{ display: 'flex', gap: 10 }}><Sk w={44} h={44} r={22} /><Sk w={44} h={44} r={22} /></span><Sk w="70%" h={14} style={{ justifySelf: 'end' }} />
+        <li key={i} className="card sk-cardx" style={{ ['--c' as string]: 'var(--sk-card)' }}>
+          <span className="tab l"><Sk w={64} h={11} /></span>
+          <span className="tab r"><Sk w={40} h={11} /></span>
+          <span className="grip" aria-hidden="true" />
+          <div className="card-link">
+            <div className="card-body">
+              <div className="time"><Sk w={78} h={32} /><Sk w={38} h={18} r={9} style={{ marginTop: 6 }} /></div>
+              <div className="teams">
+                <div className="team"><span className="badge"><Sk w={46} h={46} r={23} /></span><span className="tn"><Sk w={58} h={13} /></span></div>
+                <div className="vs"><span className="v"><Sk w={14} h={10} /></span></div>
+                <div className="team"><span className="badge"><Sk w={46} h={46} r={23} /></span><span className="tn"><Sk w={58} h={13} /></span></div>
+              </div>
+              <div className="venue"><Sk w={92} h={17} /><Sk w={128} h={12} style={{ marginTop: 5 }} /></div>
+            </div>
+            <div className="meta"><Sk w={104} h={28} r={14} /><Sk w={86} h={28} r={14} /></div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 18 }}><Sk w={100} h={26} r={13} /><Sk w={86} h={26} r={13} /></div>
-        </div>
+        </li>
       ))}
-    </div>
+    </ol>
   )
 }
 
 export function SkPanel({ lines = 4 }: { lines?: number }) {
   return (
-    <section className="panel" role="status" aria-label="Loading">
+    <section className="panel sk-delay" role="status" aria-label="Loading">
       <Sk w="40%" h={18} />
       <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>{Array.from({ length: lines }, (_, i) => <Sk key={i} w={`${92 - i * 9}%`} h={14} />)}</div>
     </section>
@@ -45,7 +56,7 @@ export function SkPanel({ lines = 4 }: { lines?: number }) {
 /** A whole screen while it loads: a header block and a list. */
 export function SkScreen({ hero = true, rows = 5 }: { hero?: boolean; rows?: number }) {
   return (
-    <div style={{ display: 'grid', gap: 12, maxWidth: 760 }} role="status" aria-label="Loading">
+    <div className="sk-delay" style={{ display: 'grid', gap: 12, maxWidth: 760 }} role="status" aria-label="Loading">
       {hero && <div className="sk-card" style={{ minHeight: 150 }}><Sk w="35%" h={14} /><Sk w="55%" h={40} style={{ marginTop: 16 }} /><Sk w="45%" h={12} style={{ marginTop: 14 }} /></div>}
       <SkRows n={rows} />
     </div>

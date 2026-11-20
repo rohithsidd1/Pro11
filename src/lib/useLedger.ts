@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { errorText } from './api'
 import { useAuth } from './auth'
 import { supabase } from './supabase'
+import { useLiveReload } from './live'
 
 export interface Balance { user_id: string; name: string; color: string; upi_id: string | null; net: number; waiting_out: number; waiting_in: number; games: number }
 export interface Claim { id: string; from_user: string; to_user: string; amount: number; note: string | null; status: string; created_at: string; who?: { name: string; color: string } }
@@ -31,6 +32,7 @@ export function useLedger() {
     setIncoming(((c.data ?? []) as Claim[]).map((x) => ({ ...x, amount: Number(x.amount) })))
     setError(null)
   }, [profile])
+  useLiveReload(['ledger_lines', 'settlements'], load)
   useEffect(() => {
     void load()
     const t = window.setInterval(() => { if (document.visibilityState === 'visible') void load() }, 30000)
@@ -47,6 +49,7 @@ export function useLedgerWith(otherId: string) {
     const { data } = await supabase.rpc('ledger_with', { p_other: otherId })
     setRows(((data ?? []) as LedgerRow[]).map((r) => ({ ...r, amount: Number(r.amount) })))
   }, [otherId])
+  useLiveReload(['ledger_lines', 'settlements'], load)
   useEffect(() => { void load() }, [load])
   return { rows, reload: load }
 }
