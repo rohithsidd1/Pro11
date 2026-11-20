@@ -5,7 +5,7 @@ import { Empty } from '../components/Empty'
 import { Icon } from '../components/Icon'
 import { SettleSheet } from '../components/SettleSheet'
 import { Shell } from '../components/Shell'
-import { SkScreen } from '../components/Skeleton'
+import { SkScreen, SkSwap } from '../components/Skeleton'
 import { errorText } from '../lib/api'
 import { istDayName, istTime } from '../lib/ist'
 import { money, useLedger, type Balance } from '../lib/useLedger'
@@ -27,12 +27,12 @@ export function Ledger() {
   }
 
   if (error) return <Shell title="Ledger"><Empty icon="alert" title="Couldn’t load the ledger" action={<button className="btn" onClick={() => void reload()}><span>Try again</span></button>}>{error}</Empty></Shell>
-  if (!balances) return <Shell title="Ledger" kicker="Who owes whom"><SkScreen /></Shell>
 
-  const people = balances.filter((b) => Math.abs(b.net) >= 0.01 || b.waiting_out || b.waiting_in)
-  const settled = balances.filter((b) => !people.includes(b))
+  const people = (balances ?? []).filter((b) => Math.abs(b.net) >= 0.01 || b.waiting_out || b.waiting_in)
+  const settled = (balances ?? []).filter((b) => !people.includes(b))
   return (
     <Shell title="Ledger" kicker="Who owes whom">
+      <SkSwap loading={!balances} skeleton={<SkScreen />}>{() => (<>
       <div className="split-2">
         <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
           <section className={`bal-hero ${total > 0.004 ? 'pos' : total < -0.004 ? 'neg' : 'zero'}`}>
@@ -89,6 +89,7 @@ export function Ledger() {
         </div>
       </div>
       {paying && <SettleSheet person={paying} onClose={() => setPaying(null)} onDone={() => { setPaying(null); void reload() }} />}
+      </>)}</SkSwap>
     </Shell>
   )
 }

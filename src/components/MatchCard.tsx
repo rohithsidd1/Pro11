@@ -11,7 +11,9 @@ function statusPills(m: Match): string[] {
     const a = scoreFor(m, m.team_a).at(-1)
     const b = scoreFor(m, m.team_b).at(-1)
     const parts = [a && `${m.team_a_short ?? shortTeam(m.team_a)} ${scoreText(a)}`, b && `${m.team_b_short ?? shortTeam(m.team_b)} ${scoreText(b)}`].filter(Boolean) as string[]
-    return parts.length ? parts : [m.status_text || 'In play']
+    // the score and Cricbuzz's status line ("Baroda need 45 runs in 30 balls"), as both are useful
+    const status = (m.status_text ?? '').trim()
+    return parts.length ? (status ? [...parts, status] : parts) : [status || 'In play']
   }
   // not live yet: the toss result if Cricbuzz has it, and never "Starts in 0m" once the time has passed
   const s = (m.status_text ?? '').trim()

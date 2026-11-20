@@ -13,6 +13,8 @@ export interface CbMatch {
   id: string; slug?: string; title?: string; teamA?: string; teamB?: string; teamAShort?: string; teamBShort?: string
   desc?: string; series?: string; seriesId?: string; format?: Fmt; state?: State; statusText?: string
   startsAt?: string; venue?: string
+  /** Live score from the match list, when Cricbuzz includes it (per team, per innings). */
+  scores?: { team: string; inning: number; r: number; w: number; o: number }[]
 }
 export interface CbPlayer { id: string; name: string; slug?: string; captain?: boolean; keeper?: boolean; role?: Role; group: 'playing' | 'bench' | 'squad' }
 export interface CbTeam { name: string; players: CbPlayer[] }
@@ -160,6 +162,21 @@ function fromMatchInfo(mi: any): CbMatch | null {
   }
 }
 
+// deno-lint-ignore no-explicit-any
+function scoresFrom(ms: any, mi: any): CbMatch['scores'] {
+  if (!ms || typeof ms !== 'object') return undefined
+  const out: NonNullable<CbMatch['scores']> = []
+  for (const [key, team] of [['team1Score', mi?.team1], ['team2Score', mi?.team2]] as const) {
+    const ts = ms[key]
+    if (!ts || typeof ts !== 'object') continue
+    for (const [ik, n] of [['inngs1', 1], ['inngs2', 2]] as const) {
+      const i = ts[ik]
+      if (i && i.runs !== undefined) out.push({ team: String(team?.teamName ?? team?.name ?? ''), inning: n, r: Number(i.runs) || 0, w: Number(i.wickets ?? 0) || 0, o: Number(i.overs ?? 0) || 0 })
+    }
+  }
+  return out.length ? out : undefined
+}
+
 // ---------------- match lists ----------------
 /** Any Cricbuzz page that lists matches: legacy menu, mobile live-scores, schedules, series pages. */
 export function parseMatchList(html: string): CbMatch[] {
@@ -171,6 +188,11 @@ export function parseMatchList(html: string): CbMatch[] {
   }
   // 1) embedded JSON match objects (most reliable when present)
   const jt = jsonText(html)
+  // { matchInfo, matchScore } pairs first, so a live match keeps its score
+  for (const o of objectsAt(jt, /(?=\{"matchInfo"\s*:)/)) {
+    const m = fromMatchInfo((o as { matchInfo?: unknown }).matchInfo)
+    if (m) { const sc = scoresFrom((o as { matchScore?: unknown }).matchScore, (o as { matchInfo?: unknown }).matchInfo); if (sc) m.scores = sc; put(m) }
+  }
   for (const o of objectsAt(jt, /"matchInfo"\s*:\s*/)) { const m = fromMatchInfo(o); if (m) put(m) }
   for (const o of objectsAt(jt, /(?=\{"matchId"\s*:)/)) { const m = fromMatchInfo(o); if (m?.teamA) put(m) }
   // 2) links to match pages, with their title and nearby start time

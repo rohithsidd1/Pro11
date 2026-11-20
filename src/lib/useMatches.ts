@@ -65,16 +65,16 @@ export type FormatChip = 'All' | 'T20' | 'ODI' | 'Test' | 'Women'
  * Today / Tomorrow / Later: matches that haven't started. Live: started and not finished; for members only the
  * ones they joined (pass `mine`), for the admin all of them. Mine: everything the member joined.
  */
-export function filterMatches(all: Match[], tab: DayTab, chip: FormatChip, mine?: Set<string>, opts: { liveAll?: boolean } = {}): Match[] {
+export function filterMatches(all: Match[], tab: DayTab, chip: FormatChip, mine?: Set<string>, _opts: { liveAll?: boolean } = {}): Match[] {
   const t1 = istDayStart(1).getTime(), t2 = istDayStart(2).getTime()
   const upcoming = (m: Match) => !m.started && !m.ended
   const live = (m: Match) => m.started && !m.ended
   const byTab = all.filter((m) => {
     const s = new Date(m.starts_at).getTime()
-    if (tab === 'Live') return live(m) && (opts.liveAll || (mine?.has(m.id) ?? false))
+    if (tab === 'Live') return live(m)
     if (tab === 'Mine') return mine?.has(m.id) ?? false
+    if (tab === 'Today') return live(m) || (upcoming(m) && s < t1)   // live matches first (sorted below), then today's upcoming
     if (!upcoming(m)) return false
-    if (tab === 'Today') return s < t1
     if (tab === 'Tomorrow') return s >= t1 && s < t2
     return s >= t2
   })
@@ -84,5 +84,5 @@ export function filterMatches(all: Match[], tab: DayTab, chip: FormatChip, mine?
     const rank = (m: Match) => (live(m) ? 0 : upcoming(m) ? 1 : 2)
     return byChip.sort((a, b) => rank(a) - rank(b) || (rank(a) === 2 ? b.starts_at.localeCompare(a.starts_at) : a.starts_at.localeCompare(b.starts_at)))
   }
-  return byChip.sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+  return byChip.sort((a, b) => (live(a) === live(b) ? 0 : live(a) ? -1 : 1) || a.starts_at.localeCompare(b.starts_at))
 }

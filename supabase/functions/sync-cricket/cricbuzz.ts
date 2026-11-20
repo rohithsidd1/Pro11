@@ -92,6 +92,12 @@ async function saveMatches(ctx: CbCtx, list: Any[]): Promise<{ saved: number; ne
     const { error } = await ctx.db.from('matches').upsert(g)
     if (error) throw error
   }
+  // live score from the list (every 5 minutes) for matches the per-minute live pass isn't already updating
+  const recent = new Date(Date.now() - 3 * 60e3).toISOString()
+  for (const m of list.filter((x) => x?.state === 'live' && x.scores?.length)) {
+    const score = m.scores.map((i: Any) => ({ inning: `${i.team} Inning ${i.inning}`, r: i.r, w: i.w, o: i.o }))
+    await ctx.db.from('matches').update({ score }).eq('id', `cb-${m.id}`).or(`cb_live_at.is.null,cb_live_at.lt.${recent}`)
+  }
   return { saved: ready.length, needTime }
 }
 

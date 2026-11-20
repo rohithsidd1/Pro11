@@ -5,7 +5,7 @@ import { Shell } from '../components/Shell'
 import { useAuth } from '../lib/auth'
 import { rupees } from '../lib/money'
 import { supabase } from '../lib/supabase'
-import { SkScreen } from '../components/Skeleton'
+import { SkScreen, SkSwap } from '../components/Skeleton'
 
 interface Row { user_id: string; name: string; color: string; played: number; won: number; winnings: number; spent: number; net: number; bonus: number }
 type Period = 'month' | 'year' | 'all'
@@ -53,7 +53,7 @@ export function Ranks() {
           <button aria-pressed={sortBy === 'bonus'} onClick={() => setSortBy('bonus')}>By bonus points</button>
         </div>
       )}
-      {!rows && <div style={{ marginTop: 16, maxWidth: 720 }}><SkScreen rows={4} /></div>}
+      <SkSwap loading={!rows} skeleton={<div style={{ marginTop: 16, maxWidth: 720 }}><SkScreen rows={4} /></div>}>
       {rows && active.length === 0 && <Empty icon="trophy" title="No finished games yet">Ranks fill in as games finish and pay out.</Empty>}
       {leader && (
         <section className="chead" style={{ ['--c' as string]: 'var(--lemon)', marginTop: 16, maxWidth: 720, paddingBottom: 20 }}>
@@ -81,6 +81,7 @@ export function Ranks() {
         </div>
       )}
       <p className="fine" style={{ paddingLeft: 0, maxWidth: 720 }}>Net = money won minus entry fees, for finished games only. Cancelled games don’t count.{showBonus ? ' Bonus points are just for bragging: they never turn into money.' : ''}</p>
+      </SkSwap>
     </Shell>
   )
 }

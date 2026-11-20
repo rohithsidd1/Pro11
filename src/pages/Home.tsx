@@ -10,7 +10,7 @@ import { Bell } from '../components/Bell'
 import { useAuth } from '../lib/auth'
 import { CARD_COLORS } from '../lib/cricket'
 import { filterMatches, useGamesFor, useMatchFeed, type DayTab, type FormatChip } from '../lib/useMatches'
-import { Sk, SkCards } from '../components/Skeleton'
+import { Sk, SkCards, SkSwap } from '../components/Skeleton'
 import { useNow } from '../lib/live'
 
 const TAB_LABEL: Record<DayTab, string> = { Today: 'Today', Tomorrow: 'Tomorrow', Later: 'Later', Live: 'Live', Mine: 'My games' }
@@ -31,8 +31,10 @@ export function Home() {
   const games = useGamesFor(matches.map((m) => m.id))
   const mineSet = new Set([...games.entries()].filter(([, g]) => g.mine).map(([id]) => id))
   const shown = filterMatches(matches, tab, chip, mineSet)
-  const todayCount = filterMatches(matches, 'Today', 'All').length
-  const liveCount = filterMatches(matches, 'Live', 'All', mineSet).length
+  const todayCount = filterMatches(matches, 'Today', 'All').filter((m) => !m.started).length
+  const liveAll = filterMatches(matches, 'Live', 'All')
+  const liveCount = liveAll.length
+  const liveMine = liveAll.filter((m) => mineSet.has(m.id)).length
 
   return (
     <Shell title="Matches" kicker={profile ? `Hi ${profile.name.split(' ')[0]}` : undefined}
@@ -45,7 +47,7 @@ export function Home() {
         <div>
           <p className="kicker">Cricket</p>
           <p className="brand">{(cfg.app_name ?? 'Pro11').toUpperCase()}</p>
-          <p className="lead">{loading ? <Sk w={200} h={14} /> : <><span className="num">{todayCount}</span> {todayCount === 1 ? 'match' : 'matches'} still to start today</>}{liveCount ? <>, <span className="num">{liveCount}</span> of yours live</> : ''}</p>
+          <p className="lead">{loading ? <Sk w={200} h={14} /> : <><span className="num">{todayCount}</span> {todayCount === 1 ? 'match' : 'matches'} still to start today</>}{liveCount ? <> · <span className="num">{liveCount}</span> live now{liveMine ? <> (<span className="num">{liveMine}</span> yours)</> : ''}</> : ''}</p>
         </div>
         <svg className="ball" aria-hidden="true"><use href="#ball" /></svg>
       </div>
@@ -70,11 +72,11 @@ export function Home() {
           Check your connection.
         </Empty>
       )}
-      {loading && <SkCards n={4} />}
-      {!error && !loading && shown.length === 0 && (
+      <SkSwap loading={loading} skeleton={<SkCards n={4} />}>
+      {!error && shown.length === 0 && (
         <Empty icon="stumps" title={tab === 'Mine' ? 'You haven’t joined a game yet' : tab === 'Live' ? 'None of your matches are live' : `No ${chip === 'All' ? '' : chip === 'Women' ? 'women’s ' : `${chip} `}matches ${tab === 'Later' ? 'after tomorrow yet' : tab === 'Today' ? 'left today' : 'tomorrow yet'}`}
           action={chip !== 'All' ? <button className="btn primary" onClick={() => setChip('All')}><span>Show all formats</span></button> : undefined}>
-          {tab === 'Live' ? 'Matches you’ve joined show here while they’re being played.' : 'New matches appear by themselves as Cricbuzz lists them.'}
+          {tab === 'Live' ? 'Live matches show here while they’re being played.' : 'New matches appear by themselves as Cricbuzz lists them.'}
         </Empty>
       )}
       {shown.length > 0 && (
@@ -82,6 +84,7 @@ export function Home() {
           {shown.map((m, i) => <MatchCard key={m.id} m={m} color={CARD_COLORS[i % CARD_COLORS.length]} games={games.get(m.id)} />)}
         </ol>
       )}
+      </SkSwap>
     </Shell>
   )
 }

@@ -592,15 +592,31 @@ body.plain-cards .stack.grid { padding-top: 0; }
 .journey li.now { color: var(--ink); font-weight: 600; } .journey li.now .dot { border-color: var(--ink); box-shadow: 0 0 0 4px var(--lemon); }
 .journey .jt { line-height: 22px; } .journey .js { color: var(--muted); font-weight: 400; }
 
-/* skeletons: a quiet base with a soft light sweep; they only appear if loading takes more than ~0.2 s */
-:root { --sk-card: #F7E4C0; }
-.sk { display: inline-block; position: relative; overflow: hidden; background: rgba(26,23,20,.08); vertical-align: middle; }
-.sk::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%);
-  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
-  animation: sk-sweep 1.6s ease-in-out infinite; }
-@keyframes sk-sweep { 100% { transform: translateX(100%) } }
-.sk-delay { animation: sk-in .2s ease .2s both; }
+/* skeletons: one soft light wave across the whole screen (every placeholder shows the same band at the same
+   moment, at a steady speed); they only appear if loading takes more than ~0.25 s, and fade in gently */
+:root { --sk-card: #F7E4C0; --sk-base: rgba(26,23,20,.075); --sk-glow: rgba(255,255,255,.5); }
+.sk { display: inline-block; vertical-align: middle; background-color: var(--sk-base);
+  background-image: linear-gradient(100deg, rgba(255,255,255,0) 35%, var(--sk-glow) 50%, rgba(255,255,255,0) 65%);
+  background-size: 180vw 100%; background-repeat: no-repeat; background-attachment: fixed;
+  animation: sk-wave 1.9s linear infinite; }
+@keyframes sk-wave { from { background-position: -80vw 0 } to { background-position: 100vw 0 } }
+/* phones that can't pin the wave to the screen (iOS): every placeholder breathes together instead */
+@supports (-webkit-touch-callout: none) {
+  .sk { background-image: none; animation: sk-breathe 1.6s ease-in-out infinite; }
+}
+@keyframes sk-breathe { 0%, 100% { opacity: 1 } 50% { opacity: .55 } }
+.sk-delay { animation: sk-in .32s ease-out .25s backwards; }
 @keyframes sk-in { from { opacity: 0 } to { opacity: 1 } }
+/* skeleton → content: crossfade (skeleton fades out on top, content fades in underneath) */
+.sk-swap { position: relative; }
+.sk-swap-in { animation: pro11-in .45s ease-in-out backwards; }
+.sk-swap-out { position: absolute; inset: 0 0 auto 0; pointer-events: none; animation: sk-out .45s ease-in-out forwards; }
+.sk-swap-out .sk-delay { animation: none; }
+@keyframes sk-out { from { opacity: 1 } to { opacity: 0 } }
+/* new cards, rows and panels ease in instead of popping; the app frame fades in after the splash */
+@keyframes pro11-in { from { opacity: 0 } to { opacity: 1 } }
+.shell { animation: pro11-in .35s ease-out backwards; }
+.page > *:not(.sk-delay):not(.sk-swap) { animation: pro11-in .28s ease-out backwards; }
 .sk-card { background: var(--paper); border-radius: var(--r-lg); padding: 18px; }
 .sk-row { background: var(--paper) !important; }
 .sk-cardx .tab, .sk-cardx .card-link { pointer-events: none; }
@@ -609,4 +625,4 @@ body.plain-cards .stack.grid { padding-top: 0; }
 .sk-cardx .badge { background: none !important; border: 0 !important; box-shadow: none !important; width: auto; height: auto; }
 .sk-cardx .tn, .sk-cardx .v { line-height: 0; }
 .sk-cardx .venue .sk { margin-left: auto; }
-@media (prefers-reduced-motion: reduce) { .sk::after { animation: none; } .sk-delay { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sk, .sk-delay, .sk-swap-in, .sk-swap-out, .shell, .page > * { animation: none !important; } .sk-swap-out { display: none; } }

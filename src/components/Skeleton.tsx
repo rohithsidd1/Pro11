@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 /** Loading placeholders with a shimmer, shaped like the content that is coming. */
 export function Sk({ w = '100%', h = 14, r = 8, style }: { w?: number | string; h?: number | string; r?: number; style?: React.CSSProperties }) {
   return <span className="sk" style={{ width: w, height: h, borderRadius: r, ...style }} aria-hidden="true" />
@@ -59,6 +60,34 @@ export function SkScreen({ hero = true, rows = 5 }: { hero?: boolean; rows?: num
     <div className="sk-delay" style={{ display: 'grid', gap: 12, maxWidth: 760 }} role="status" aria-label="Loading">
       {hero && <div className="sk-card" style={{ minHeight: 150 }}><Sk w="35%" h={14} /><Sk w="55%" h={40} style={{ marginTop: 16 }} /><Sk w="45%" h={12} style={{ marginTop: 14 }} /></div>}
       <SkRows n={rows} />
+    </div>
+  )
+}
+
+/**
+ * Swaps a skeleton for the real content with a crossfade: the skeleton fades out on top while the content fades
+ * in underneath, so there's never a hard cut or an empty frame. If loading was so quick that the skeleton never
+ * became visible (under ~0.3 s), the content simply eases in and the skeleton is never shown.
+ * `children` can be a function, so content that needs the loaded data is only built once it exists.
+ */
+export function SkSwap({ loading, skeleton, children }: { loading: boolean; skeleton: React.ReactNode; children: React.ReactNode | (() => React.ReactNode) }) {
+  const [leaving, setLeaving] = useState(false)
+  const startedAt = useRef<number | null>(loading ? Date.now() : null)
+  const wasLoading = useRef(loading)
+  useEffect(() => {
+    if (loading && !wasLoading.current) startedAt.current = Date.now()
+    if (!loading && wasLoading.current) {
+      const shownFor = startedAt.current ? Date.now() - startedAt.current : 0
+      wasLoading.current = false
+      if (shownFor > 300) { setLeaving(true); const t = window.setTimeout(() => setLeaving(false), 470); return () => window.clearTimeout(t) }
+    }
+    wasLoading.current = loading
+  }, [loading])
+  if (loading) return <>{skeleton}</>
+  return (
+    <div className="sk-swap">
+      <div className="sk-swap-in">{typeof children === 'function' ? (children as () => React.ReactNode)() : children}</div>
+      {leaving && <div className="sk-swap-out" aria-hidden="true">{skeleton}</div>}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { Icon, type IconName } from '../components/Icon'
 import { Shell } from '../components/Shell'
 import { istDayName, istTime } from '../lib/ist'
 import { useNotifications, type Notice } from '../lib/useNotifications'
-import { SkRows } from '../components/Skeleton'
+import { SkRows, SkSwap } from '../components/Skeleton'
 
 const ICON: Record<string, [IconName, string]> = {
   contest_scored: ['trophy', 'var(--lemon)'], contest_paid: ['trophy', 'var(--mint)'],
@@ -21,8 +21,8 @@ export function Notifications() {
   return (
     <Shell title="Notifications" back="/" kicker={unread ? `${unread} unread` : 'All caught up'}
       actions={unread > 0 ? <button className="btn sm" onClick={() => markRead(items.filter((n) => !n.read_at).map((n) => n.id))}><Icon name="check" small /><span>Read all</span></button> : undefined}>
-      {loading && <SkRows n={6} />}
-      {!loading && items.length === 0 && <Empty icon="bell" title="Nothing yet">Game results, alerts and payments to confirm show up here.</Empty>}
+      <SkSwap loading={loading} skeleton={<SkRows n={6} />}>
+      {items.length === 0 && <Empty icon="bell" title="Nothing yet">Game results, alerts and payments to confirm show up here.</Empty>}
       <div className="list" style={{ maxWidth: 720 }}>
         {items.map((n) => {
           const [icon, bg] = ICON[n.kind] ?? ['bell', 'var(--soft)']
@@ -38,6 +38,7 @@ export function Notifications() {
           )
         })}
       </div>
+      </SkSwap>
     </Shell>
   )
 }

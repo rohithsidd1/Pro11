@@ -87,7 +87,7 @@ export default async (req: Request) => {
   if (req.method === 'GET') {
     if (url.searchParams.has('raw')) {
       const path = url.searchParams.get('raw') ?? ''
-      if (!/^\/(live-cricket-scorecard|cricket-match-squads|live-cricket-scores|cricket-scores|api\/html\/cricket-scorecard)\/\d+/.test(path)) return json({ error: 'Only Cricbuzz match pages.' }, 400)
+      if (!/^\/(live-cricket-scorecard|cricket-match-squads|live-cricket-scores|cricket-scores|api\/html\/cricket-scorecard)\/\d+/.test(path) && path !== '/cricket-match/live-scores') return json({ error: 'Only Cricbuzz match pages.' }, 400)
       const g = await get(`${WWW()}${path}`, 8000)
       const jt = jsonText(g.html)
       const keys = (url.searchParams.get('keys') ?? 'bowl,playing,bench,toss,captain').split(',').filter(Boolean).slice(0, 8)
