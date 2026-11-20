@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
@@ -23,6 +24,25 @@ export function Shell({ title, kicker, actions, back, children }: {
   const pending = usePendingCodeCount(isAdmin)
   const navigate = useNavigate()
   const claims = usePendingClaims()
+  // measure the bottom navigation on this device (model, text size, Safari's toolbar, rotation) so the bars and
+  // messages above it, and the space at the end of each screen, always clear it
+  const navRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const root = document.documentElement
+    const navSpace = () => {
+      const n = navRef.current
+      const r = n?.getBoundingClientRect()
+      const space = n && r && r.height > 0 && getComputedStyle(n).display !== 'none' ? Math.max(0, Math.round(window.innerHeight - r.top)) : 0
+      root.style.setProperty('--nav-space', `${space}px`)
+    }
+    navSpace()
+    const ro = typeof ResizeObserver !== 'undefined' && navRef.current ? new ResizeObserver(navSpace) : null
+    if (ro && navRef.current) ro.observe(navRef.current)
+    window.addEventListener('resize', navSpace)
+    window.visualViewport?.addEventListener('resize', navSpace)
+    window.addEventListener('orientationchange', navSpace)
+    return () => { ro?.disconnect(); window.removeEventListener('resize', navSpace); window.visualViewport?.removeEventListener('resize', navSpace); window.removeEventListener('orientationchange', navSpace) }
+  }, [])
   const USER_NAV = USER_NAV_BASE.map((n) => (n.to === '/ledger' ? { ...n, count: claims } : n))
   const adminNav: NavItem[] = [
     { to: '/admin', icon: 'shield', label: 'Dashboard', end: true },
@@ -78,7 +98,7 @@ export function Shell({ title, kicker, actions, back, children }: {
         <OfflineBanner />{children}</main>
       </div>
 
-      <nav className="bottom-nav" aria-label="Main">
+      <nav className="bottom-nav" aria-label="Main" ref={navRef}>
         {mobileNav.map((n) => (
           <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => `nav-btn${isActive ? ' active' : ''}`}>
             <span style={{ position: 'relative' }}>

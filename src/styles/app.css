@@ -173,7 +173,7 @@ svg.i.s { width: 18px; height: 18px; }
 .meta-line { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 
 /* ---------- toast ---------- */
-.toast { position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 50;
+.toast { position: fixed; left: 50%; bottom: calc(var(--nav-space, 86px) + 14px); transform: translateX(-50%); z-index: 50;
   background: var(--ink); color: var(--paper); padding: 12px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; box-shadow: 0 16px 30px -16px rgba(0,0,0,.5); }
 
 /* ---------- big screens: sidebar + split sign-in ---------- */
@@ -479,7 +479,7 @@ svg.i.s { width: 18px; height: 18px; }
 .tick svg { width: 16px; height: 16px; }
 .prow-btn[aria-pressed="true"] .tick { background: var(--ink); color: var(--paper); }
 .role-h { font-family: var(--display); font-size: 15px; font-weight: 700; letter-spacing: -.01em; padding: 16px 2px 8px; display: flex; justify-content: space-between; }
-.footbar { position: sticky; bottom: 86px; z-index: 5; margin-top: 16px; }
+.footbar { position: sticky; bottom: calc(var(--nav-space, 86px) + 10px); z-index: 5; margin-top: 16px; }
 .footbar-in { display: flex; align-items: center; gap: 12px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 999px; padding: 6px 6px 6px 20px; }
 .footbar .fk { font-size: 12px; font-weight: 600; color: var(--muted); }
 .footbar .fv { font-size: 18px; font-weight: 700; }
@@ -670,3 +670,15 @@ body.plain-cards .stack.grid { padding-top: 0; }
 .ranks-leader .s { font-size: 13px; color: var(--muted); }
 .ranks-leader .amt { font-family: var(--display); font-weight: 800; font-size: 26px; }
 .ranks-how { margin-top: 16px; max-width: 720px; }
+
+/* everything above the bottom navigation uses its measured size (--nav-space, set by the app on this device) */
+.page { padding-bottom: calc(var(--nav-space, 0px) + 28px); }
+/* role tabs and other switches hold up on narrow phones */
+.seg button { min-width: 0; white-space: nowrap; padding-left: 6px; padding-right: 6px; }
+@media (max-width: 359.98px) { .seg button { font-size: 13px; } }
+/* the match header on narrow phones: badges and the time shrink a little so nothing pokes past the edge */
+.face { min-width: 0; }
+@media (max-width: 359.98px) {
+  .face .badge { width: 64px !important; height: 64px !important; }
+  .face .when .t, .face .when .big { font-size: 34px; }
+}

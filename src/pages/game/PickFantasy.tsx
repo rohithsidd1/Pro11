@@ -94,7 +94,9 @@ export function PickFantasy() {
     setSaved({ title: 'Team saved', detail: `11 players, with ${byId.get(cap)?.name ?? 'your captain'} as captain (${rules.captain}×) and ${byId.get(vice)?.name ?? 'your vice-captain'} as vice-captain (${rules.vice}×).` })
   }
 
-  const list = smartFilter(players.filter((p) => p.role === role), fq, (p) => [p.name, p.team, roleWords(p.role)]).sort((a, b) => a.team.localeCompare(b.team) || a.name.localeCompare(b.name))
+  const list = fq
+    ? smartFilter(players, fq, (p) => [p.name, p.team, roleWords(p.role)])
+    : players.filter((p) => p.role === role).sort((a, b) => a.team.localeCompare(b.team) || a.name.localeCompare(b.name))
 
   return (
     <Shell title="Fantasy XI" kicker={open ? `Locks at ${istTime(contest.lock_at)}, in ${untilText(contest.lock_at)}` : 'Locked'} back={`/match/${id}`}
@@ -118,14 +120,15 @@ export function PickFantasy() {
               {teams.map((t) => <div key={t}><p className="k">{shortTeam(t)}</p><p className="v">{sideCount(t)}<span style={{ fontSize: 13, color: 'var(--muted)' }}>/{rules.maxPerSide}</span></p></div>)}
             </div>
             <div className="seg" role="group" aria-label="Role" style={{ marginTop: 12 }}>
-          <div className="search-wrap"><SearchBar value={fq} onChange={setFq} placeholder="Search players" label="Search players" /></div>
               {ROLE_ORDER.map((r) => (
                 <button key={r} aria-pressed={role === r} onClick={() => setRole(r)}>
                   {SHORT[r]} <span className="num" style={{ fontWeight: 500, fontSize: 12 }}>{roleCount(r)}</span>
                 </button>
               ))}
             </div>
-            <p className="help" style={{ margin: '10px 0 0' }}>{ROLE_PLURAL[role]}: pick {rules.roles[role][0]}–{rules.roles[role][1]}. Most {rules.maxPerSide} from one team.</p>
+            <div className="search-wrap"><SearchBar value={fq} onChange={setFq} placeholder="Search all players" label="Search players" /></div>
+            {fq && <p className="help" style={{ marginTop: 6 }}>Searching every role. Clear the search to pick by role.</p>}
+            {!fq && <p className="help" style={{ margin: '10px 0 0' }}>{ROLE_PLURAL[role]}: pick {rules.roles[role][0]}–{rules.roles[role][1]}. Most {rules.maxPerSide} from one team.</p>}
             <div className="list" style={{ marginTop: 10 }}>
               {list.map((p) => {
                 const on = sel.has(p.player_id)
@@ -134,7 +137,7 @@ export function PickFantasy() {
                   <button key={p.player_id} className="prow-btn" aria-pressed={on} disabled={!open || (!on && !!why)} onClick={() => toggle(p)}>
                     <span className="p-ini" style={{ ['--tc' as string]: teamColor(p.team) }} aria-hidden="true">{initials(p.name)}</span>
                     <span style={{ minWidth: 0 }}><span className="rt">{p.name}</span>
-                      <span className="rs">{shortTeam(p.team)}{cap === p.player_id ? ', captain' : vice === p.player_id ? ', vice-captain' : ''}{!on && why ? `, ${why.toLowerCase()}` : ''}</span></span>
+                      <span className="rs">{shortTeam(p.team)}{fq ? `, ${ROLE_LABEL[p.role]}` : ''}{cap === p.player_id ? ', captain' : vice === p.player_id ? ', vice-captain' : ''}{!on && why ? `, ${why.toLowerCase()}` : ''}</span></span>
                     <span className="tick" aria-hidden="true"><Icon name={on ? 'check' : 'plus'} /></span>
                   </button>
                 )
