@@ -101,13 +101,19 @@ export default async (req: Request) => {
     }
     // Squad report: for every match in the next 48 h, does Cricbuzz have squads, and what did we read? (public data only)
     if (url.searchParams.has('squads')) {
-      const hours = Math.min(96, Number(url.searchParams.get('hours') ?? 48) || 48)
-      const l = await list()
+      const hours = Math.min(240, Number(url.searchParams.get('hours') ?? 48) || 48)
+      // the live-scores list plus the series schedules (later matches are often only in the schedules)
+      const [l, sch] = await Promise.all([list(), schedule()])
+      const byId = new Map<string, CbMatch>()
+      for (const m of [...l.matches, ...sch.matches]) if (!byId.has(m.id)) byId.set(m.id, m)
+      const q = (url.searchParams.get('q') ?? '').toLowerCase()
       const now = Date.now()
-      const due = l.matches
+      const due = [...byId.values()]
+        .filter((m) => !q || `${m.teamA} ${m.teamB} ${m.desc ?? ''}`.toLowerCase().includes(q))
         .filter((m) => m.state !== 'ended' && m.startsAt && new Date(m.startsAt).getTime() > now - 6 * 36e5 && new Date(m.startsAt).getTime() < now + hours * 36e5)
         .sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt)))
         .slice(Number(url.searchParams.get('from') ?? 0), Number(url.searchParams.get('from') ?? 0) + 14)
+      const total = [...byId.values()].filter((m) => m.state !== 'ended' && m.startsAt && new Date(m.startsAt).getTime() > now - 6 * 36e5 && new Date(m.startsAt).getTime() < now + hours * 36e5).length
       const rows = await Promise.all(due.map(async (m) => {
         const g = await get(`${WWW()}/cricket-match-squads/${m.id}`, 6000)
         const jt = jsonText(g.html)
@@ -120,7 +126,7 @@ export default async (req: Request) => {
           gamesWouldOpen: counts.length === 2 && counts.every((c) => c.players >= 11),
         }
       }))
-      return json({ checkedAt: new Date().toISOString(), hours, matches: rows })
+      return json({ checkedAt: new Date().toISOString(), hours, inWindow: total, matches: rows })
     }
     if (!url.searchParams.has('debug')) return json({ ok: true, hint: 'Add ?debug=1 for a health report.' })
     const id = url.searchParams.get('id') ?? undefined
